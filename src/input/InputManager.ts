@@ -32,13 +32,6 @@ interface BatteryPosition {
   y: number;
 }
 
-interface BatterySlotMap {
-  regionId: number;
-  slotIndex: number;
-  x: number;
-  y: number;
-}
-
 interface CityMapEntry {
   regionId: number;
   cityIndex: number;
@@ -59,7 +52,6 @@ export class InputManager {
     { x: 160, y: GROUND_Y },
     { x: 1120, y: GROUND_Y },
   ];
-  private batterySlotIndex: BatterySlotMap[] = [];
   private cityIndexMap: CityMapEntry[] = [];
 
   /** Callback invoked with arc prediction results (or null to clear). */
@@ -130,7 +122,6 @@ export class InputManager {
   /** Update battery positions and tech tree from campaign state */
   updateBatteryPositions(campaign: CampaignSnapshot) {
     const positions: BatteryPosition[] = [];
-    const batteryMap: BatterySlotMap[] = [];
     const cityMap: CityMapEntry[] = [];
     const regionById = new Map(campaign.regions.map((region) => [region.id, region]));
     const ownedIds =
@@ -148,12 +139,10 @@ export class InputManager {
         const slot = region.battery_slots[i];
         if (!slot.occupied) continue;
         positions.push({ x: slot.x, y: slot.y });
-        batteryMap.push({ regionId: region.id, slotIndex: i, x: slot.x, y: slot.y });
       }
     }
 
     this.batteryPositions = positions;
-    this.batterySlotIndex = batteryMap;
     this.cityIndexMap = cityMap;
 
     // Clamp selected battery
@@ -207,12 +196,6 @@ export class InputManager {
 
   getBatteryPosition(id: number): BatteryPosition | null {
     return this.batteryPositions[id] ?? null;
-  }
-
-  private findBatteryIndex(regionId: number, slotIndex: number): number {
-    return this.batterySlotIndex.findIndex(
-      (entry) => entry.regionId === regionId && entry.slotIndex === slotIndex
-    );
   }
 
   private findCityIndex(regionId: number, cityIndex: number): number {
