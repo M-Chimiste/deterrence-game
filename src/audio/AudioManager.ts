@@ -6,6 +6,7 @@ import {
   createMirvSplitSound,
   createUiClickSound,
 } from "./SoundSynth";
+import { MusicManager } from "./MusicManager";
 
 const WORLD_WIDTH = 1280;
 
@@ -18,9 +19,12 @@ export class AudioManager {
   private masterGain: GainNode | null = null;
   private effectsGain: GainNode | null = null;
   private ambientGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
   private ambientOsc: OscillatorNode | null = null;
+  private music: MusicManager | null = null;
   private _muted: boolean = false;
   private _volume: number = 0.5;
+  private _musicVolume: number = 0.7;
 
   /** Ensure AudioContext exists (must be called after user gesture) */
   private ensureContext(): AudioContext {
@@ -37,6 +41,13 @@ export class AudioManager {
       this.ambientGain = this.ctx.createGain();
       this.ambientGain.gain.value = 0.3;
       this.ambientGain.connect(this.masterGain);
+
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = 1.0;
+      this.musicGain.connect(this.masterGain);
+
+      this.music = new MusicManager(this.ctx, this.musicGain);
+      this.music.setVolume(this._musicVolume);
     }
     // Resume if suspended (browser policy)
     if (this.ctx.state === "suspended") {
@@ -158,5 +169,27 @@ export class AudioManager {
     if (this.masterGain && !this._muted) {
       this.masterGain.gain.value = this._volume;
     }
+  }
+
+  /** Trigger music change for a phase transition */
+  setPhase(phase: string, waveNumber: number): void {
+    this.ensureContext();
+    this.music?.setPhase(phase, waveNumber);
+  }
+
+  /** Set music volume independently from master */
+  setMusicVolume(vol: number): void {
+    this._musicVolume = Math.max(0, Math.min(1, vol));
+    this.music?.setVolume(this._musicVolume);
+  }
+
+  get musicVolume(): number {
+    return this._musicVolume;
+  }
+
+  /** Preload music for upcoming phase */
+  preloadMusic(phase: string, waveNumber: number): void {
+    this.ensureContext();
+    this.music?.preloadForPhase(phase, waveNumber);
   }
 }

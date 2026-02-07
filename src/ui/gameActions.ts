@@ -3,6 +3,7 @@ import type { AvailableAction } from "../types/campaign";
 export interface GameActions {
   setMuted: (muted: boolean) => void;
   setVolume: (volume: number) => void;
+  setMusicVolume: (volume: number) => void;
   playUiClick: () => void;
   handleStrategicAction: (action: AvailableAction) => void;
 }
@@ -27,6 +28,10 @@ export function setMuted(muted: boolean) {
 
 export function setVolume(volume: number) {
   actions?.setVolume(volume);
+}
+
+export function setMusicVolume(volume: number) {
+  actions?.setMusicVolume(volume);
 }
 
 export function handleStrategicAction(action: AvailableAction) {

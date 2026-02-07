@@ -13,6 +13,7 @@ export type GamePhase =
 export interface GameSettings {
   audioEnabled: boolean;
   volume: number;
+  musicVolume: number;
   resolution: string;
   fullscreen: boolean;
 }
@@ -44,6 +45,7 @@ const SETTINGS_KEY = "deterrence_settings";
 const DEFAULT_SETTINGS: GameSettings = {
   audioEnabled: true,
   volume: 0.5,
+  musicVolume: 0.7,
   resolution: "720p",
   fullscreen: false,
 };

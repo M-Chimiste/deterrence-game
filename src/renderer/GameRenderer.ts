@@ -135,6 +135,7 @@ export class GameRenderer {
 
       // Audio: phase transitions
       if (snapshot.phase !== this.lastPhase) {
+        this.audio.setPhase(snapshot.phase, snapshot.wave_number);
         if (snapshot.phase === "WaveActive") {
           this.audio.playWaveStart();
           this.audio.startAmbient(snapshot.weather ?? "Clear");
@@ -176,6 +177,7 @@ export class GameRenderer {
     registerGameActions({
       setMuted: (muted) => this.setMuted(muted, true),
       setVolume: (volume) => this.setVolume(volume),
+      setMusicVolume: (volume) => this.setMusicVolume(volume),
       playUiClick: () => this.playUiClick(),
       handleStrategicAction: (action) => this.inputManager.handleStrategicAction(action),
     });
@@ -245,7 +247,12 @@ export class GameRenderer {
       this.audio.toggleMute();
     }
     this.audio.setVolume(settings.volume);
+    this.audio.setMusicVolume(settings.musicVolume ?? 0.7);
     this.store.getState().setHud({ muted: this.audio.muted });
+
+    // Preload and start title music
+    this.audio.preloadMusic("MainMenu", 0);
+    this.audio.setPhase("MainMenu", 0);
 
     // Update menu background + particles each frame
     this.app.ticker.add((ticker) => {
@@ -416,6 +423,10 @@ export class GameRenderer {
 
   private setVolume(volume: number) {
     this.audio.setVolume(volume);
+  }
+
+  private setMusicVolume(volume: number) {
+    this.audio.setMusicVolume(volume);
   }
 
   private playUiClick() {
