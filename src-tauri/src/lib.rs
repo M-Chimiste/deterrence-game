@@ -19,7 +19,7 @@ pub fn run() {
             commands::campaign::continue_to_strategic,
             commands::campaign::expand_region,
             commands::campaign::place_battery,
-            commands::campaign::restock_battery,
+            commands::campaign::restock_all_batteries,
             commands::campaign::repair_city,
             commands::campaign::unlock_interceptor,
             commands::campaign::upgrade_interceptor,

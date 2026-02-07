@@ -6,7 +6,7 @@ import {
   continueToStrategic,
   expandRegion,
   placeBattery,
-  restockBattery,
+  restockAllBatteries,
   repairCity,
   unlockInterceptor,
   upgradeInterceptor,
@@ -188,14 +188,8 @@ export class InputManager {
         action.PlaceBattery.region_id,
         action.PlaceBattery.slot_index
       );
-    } else if ("RestockBattery" in action) {
-      const batteryIndex = this.findBatteryIndex(
-        action.RestockBattery.region_id,
-        action.RestockBattery.slot_index
-      );
-      if (batteryIndex >= 0) {
-        restockBattery(batteryIndex);
-      }
+    } else if ("RestockAllBatteries" in action) {
+      restockAllBatteries();
     } else if ("RepairCity" in action) {
       const cityIndex = this.findCityIndex(
         action.RepairCity.region_id,

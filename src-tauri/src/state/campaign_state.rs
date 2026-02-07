@@ -186,7 +186,7 @@ pub struct BatterySlotSnapshot {
 pub enum AvailableAction {
     ExpandRegion { region_id: u32, cost: u32 },
     PlaceBattery { region_id: u32, slot_index: u32, cost: u32 },
-    RestockBattery { region_id: u32, slot_index: u32, cost: u32 },
+    RestockAllBatteries { count: u32, cost: u32 },
     RepairCity { region_id: u32, city_index: u32, cost: u32, health_to_restore: f32 },
     UnlockInterceptor { interceptor_type: String, cost: u32, min_wave: u32 },
     UpgradeInterceptor { interceptor_type: String, axis: String, cost: u32, current_level: u32 },

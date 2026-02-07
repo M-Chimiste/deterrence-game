@@ -52,7 +52,7 @@ export interface BatterySlotSnapshot {
 export type AvailableAction =
   | { ExpandRegion: { region_id: number; cost: number } }
   | { PlaceBattery: { region_id: number; slot_index: number; cost: number } }
-  | { RestockBattery: { region_id: number; slot_index: number; cost: number } }
+  | { RestockAllBatteries: { count: number; cost: number } }
   | { RepairCity: { region_id: number; city_index: number; cost: number; health_to_restore: number } }
   | { UnlockInterceptor: { interceptor_type: string; cost: number; min_wave: number } }
   | { UpgradeInterceptor: { interceptor_type: string; axis: string; cost: number; current_level: number } }

@@ -354,40 +354,43 @@ impl Simulation {
         Ok(())
     }
 
-    /// Restock a battery's ammo. Uses battery_ids index.
-    pub fn restock_battery(&mut self, battery_index: u32) -> Result<(), String> {
-        let cost = self.campaign.cost_table.restock_battery;
-        if self.campaign.resources < cost {
+    /// Restock all batteries that are not at max ammo.
+    /// Charges per-battery cost for each battery restocked.
+    pub fn restock_all_batteries(&mut self) -> Result<(), String> {
+        let per_battery_cost = self.campaign.cost_table.restock_battery;
+
+        // Find which batteries need restocking
+        let mut to_restock: Vec<(usize, u32)> = Vec::new();
+        for (i, &bid) in self.battery_ids.iter().enumerate() {
+            if self.world.is_alive(bid)
+                && let Some(bs) = &self.world.battery_states[bid.index as usize]
+                    && bs.ammo < bs.max_ammo
+            {
+                to_restock.push((i, bs.max_ammo));
+            }
+        }
+
+        if to_restock.is_empty() {
+            return Err("No batteries need restocking".into());
+        }
+
+        let total_cost = per_battery_cost * to_restock.len() as u32;
+        if self.campaign.resources < total_cost {
             return Err(format!(
                 "Insufficient resources: have {}, need {}",
-                self.campaign.resources, cost
+                self.campaign.resources, total_cost
             ));
         }
 
-        let bid = *self
-            .battery_ids
-            .get(battery_index as usize)
-            .ok_or("Invalid battery index")?;
-        if !self.world.is_alive(bid) {
-            return Err("Battery not alive".into());
+        for (battery_idx, max_ammo) in &to_restock {
+            let bid = self.battery_ids[*battery_idx];
+            self.world.battery_states[bid.index as usize]
+                .as_mut()
+                .unwrap()
+                .ammo = *max_ammo;
+            self.sync_battery_ammo_at(*battery_idx, *max_ammo);
         }
-
-        let max_ammo = {
-            let bs = self.world.battery_states[bid.index as usize]
-                .as_ref()
-                .ok_or("No battery state")?;
-            if bs.ammo >= bs.max_ammo {
-                return Err("Battery already full".into());
-            }
-            bs.max_ammo
-        };
-
-        self.world.battery_states[bid.index as usize]
-            .as_mut()
-            .unwrap()
-            .ammo = max_ammo;
-        self.campaign.resources -= cost;
-        self.sync_battery_ammo_at(battery_index as usize, max_ammo);
+        self.campaign.resources -= total_cost;
 
         Ok(())
     }
@@ -550,19 +553,22 @@ impl Simulation {
             }
         }
 
-        for (i, &bid) in self.battery_ids.iter().enumerate() {
+        // Count batteries needing restock and offer a single "restock all" action
+        let mut restock_count: u32 = 0;
+        for &bid in &self.battery_ids {
             if self.world.is_alive(bid)
                 && let Some(bs) = &self.world.battery_states[bid.index as usize]
                     && bs.ammo < bs.max_ammo
-                        && self.campaign.resources >= self.campaign.cost_table.restock_battery
-                    {
-                        let (rid, si) = self.battery_index_to_region(i);
-                        available_actions.push(AvailableAction::RestockBattery {
-                            region_id: rid.0,
-                            slot_index: si as u32,
-                            cost: self.campaign.cost_table.restock_battery,
-                        });
-                    }
+            {
+                restock_count += 1;
+            }
+        }
+        if restock_count > 0 {
+            let total_cost = self.campaign.cost_table.restock_battery * restock_count;
+            available_actions.push(AvailableAction::RestockAllBatteries {
+                count: restock_count,
+                cost: total_cost,
+            });
         }
 
         for (i, &cid) in self.city_ids.iter().enumerate() {

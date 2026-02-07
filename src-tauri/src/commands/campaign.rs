@@ -24,8 +24,8 @@ pub fn place_battery(engine: tauri::State<'_, GameEngine>, region_id: u32, slot_
 }
 
 #[tauri::command]
-pub fn restock_battery(engine: tauri::State<'_, GameEngine>, battery_index: u32) {
-    engine.send_command(EngineCommand::RestockBattery { battery_index });
+pub fn restock_all_batteries(engine: tauri::State<'_, GameEngine>) {
+    engine.send_command(EngineCommand::RestockAllBatteries);
 }
 
 #[tauri::command]

@@ -17,10 +17,12 @@ function formatAction(action: AvailableAction, regions: RegionSnapshot[]) {
     const name = regions.find((r) => r.id === region_id)?.name ?? `Region ${region_id}`;
     return { label: `PLACE BATTERY: ${name} ($${cost})`, cost, isStart: false };
   }
-  if ("RestockBattery" in action) {
-    const { region_id, cost } = action.RestockBattery;
-    const name = regions.find((r) => r.id === region_id)?.name ?? `Region ${region_id}`;
-    return { label: `RESTOCK: ${name} ($${cost})`, cost, isStart: false };
+  if ("RestockAllBatteries" in action) {
+    const { count, cost } = action.RestockAllBatteries;
+    const label = count === 1
+      ? `RESTOCK BATTERIES ($${cost})`
+      : `RESTOCK ALL BATTERIES x${count} ($${cost})`;
+    return { label, cost, isStart: false };
   }
   if ("RepairCity" in action) {
     const { region_id, cost } = action.RepairCity;

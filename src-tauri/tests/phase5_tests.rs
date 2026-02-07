@@ -144,37 +144,41 @@ fn place_battery_fails_region_not_owned() {
     assert!(result.is_err());
 }
 
-// --- Strategic Actions: Restock Battery ---
+// --- Strategic Actions: Restock All Batteries ---
 
 #[test]
-fn restock_battery_succeeds() {
+fn restock_all_batteries_succeeds() {
     let mut sim = Simulation::new();
     sim.setup_world();
 
-    // Deplete battery ammo
+    // Deplete both batteries
     let bat0 = sim.battery_ids[0];
+    let bat1 = sim.battery_ids[1];
     sim.world.battery_states[bat0.index as usize].as_mut().unwrap().ammo = 0;
+    sim.world.battery_states[bat1.index as usize].as_mut().unwrap().ammo = 0;
 
     let resources_before = sim.campaign.resources;
-    let result = sim.restock_battery(0);
+    let result = sim.restock_all_batteries();
     assert!(result.is_ok());
-    assert_eq!(sim.campaign.resources, resources_before - 30); // restock cost = 30
+    assert_eq!(sim.campaign.resources, resources_before - 60); // 30 per battery * 2
 
-    let ammo = sim.world.battery_states[bat0.index as usize].unwrap().ammo;
-    assert_eq!(ammo, config::BATTERY_MAX_AMMO);
+    let ammo0 = sim.world.battery_states[bat0.index as usize].unwrap().ammo;
+    let ammo1 = sim.world.battery_states[bat1.index as usize].unwrap().ammo;
+    assert_eq!(ammo0, config::BATTERY_MAX_AMMO);
+    assert_eq!(ammo1, config::BATTERY_MAX_AMMO);
 }
 
 #[test]
-fn restock_battery_fails_already_full() {
+fn restock_all_batteries_fails_all_full() {
     let mut sim = Simulation::new();
     sim.setup_world();
 
-    let result = sim.restock_battery(0);
+    let result = sim.restock_all_batteries();
     assert!(result.is_err());
 }
 
 #[test]
-fn restock_battery_fails_insufficient_resources() {
+fn restock_all_batteries_fails_insufficient_resources() {
     let mut sim = Simulation::new();
     sim.setup_world();
 
@@ -182,7 +186,7 @@ fn restock_battery_fails_insufficient_resources() {
     sim.world.battery_states[bat0.index as usize].as_mut().unwrap().ammo = 0;
     sim.campaign.resources = 0;
 
-    let result = sim.restock_battery(0);
+    let result = sim.restock_all_batteries();
     assert!(result.is_err());
 }
 

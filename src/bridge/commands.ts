@@ -58,8 +58,8 @@ export async function placeBattery(
   await invoke("place_battery", { regionId, slotIndex });
 }
 
-export async function restockBattery(batteryIndex: number): Promise<void> {
-  await invoke("restock_battery", { batteryIndex });
+export async function restockAllBatteries(): Promise<void> {
+  await invoke("restock_all_batteries");
 }
 
 export async function repairCity(cityIndex: number): Promise<void> {

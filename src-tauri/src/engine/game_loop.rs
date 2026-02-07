@@ -25,7 +25,7 @@ pub enum EngineCommand {
     ContinueToStrategic,
     ExpandRegion { region_id: u32 },
     PlaceBattery { region_id: u32, slot_index: u32 },
-    RestockBattery { battery_index: u32 },
+    RestockAllBatteries,
     RepairCity { city_index: u32 },
     UnlockInterceptor { interceptor_type: String },
     UpgradeInterceptor { interceptor_type: String, axis: String },
@@ -129,9 +129,9 @@ fn run_loop(rx: mpsc::Receiver<EngineCommand>, app: AppHandle) {
                             let _ = app.emit("campaign:state_update", &campaign);
                         }
                 }
-                EngineCommand::RestockBattery { battery_index } => {
+                EngineCommand::RestockAllBatteries => {
                     if sim.phase == GamePhase::Strategic
-                        && sim.restock_battery(battery_index).is_ok() {
+                        && sim.restock_all_batteries().is_ok() {
                             let snapshot = sim.build_snapshot();
                             let _ = app.emit("game:state_snapshot", &snapshot);
                             let campaign = sim.build_campaign_snapshot();
