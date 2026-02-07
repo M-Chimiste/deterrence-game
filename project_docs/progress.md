@@ -460,7 +460,51 @@ Input → WaveSpawner → Thrust → Gravity → Drag → **Wind** → Movement 
 
 ---
 
-## Phase 8B: Next Steps
+## Phase 8B: Title Screen Overhaul ✅
+
+**Status:** Complete
+**Date:** 2026-02-07
+
+### Deliverables
+- Physics-based title screen animation: ballistic missile arcs, thrust-powered interceptors, MIRV splitting
+- Cycling terminal display with 15 rotating data screens and character-by-character typewriter effect
+- Ground elements: dim city silhouettes and battery triangles at ground line
+- Hidden Claudism easter eggs in terminal text (model names as personnel, LLM terms as military jargon)
+
+### MenuBackground.ts — Physics Overhaul
+- **Missiles:** Ballistic arcs using real trajectory math (`vy = (targetY-spawnY)/T - 0.5*g*T`), 4-9s flight times, target random cities
+- **Interceptors:** Thrust-based with burn phase (600-900 thrust), gravity, post-burn coast/ballistic, lead-target prediction
+- **MIRVs:** 25% of missiles are MIRV carriers, split at ~370 screenY into 3 children in 0.5 rad fan pattern, cyan burst effect
+- **Detonation:** Proximity (20px) between interceptors and missiles triggers colored expanding explosion
+- **Overshoot:** Post-burn interceptors moving away from target self-detonate
+- **Ground elements:** New Graphics layer with ground line, 3 city silhouettes, 2 battery triangles (all dim cyan)
+- **Entity types:** Separate `MenuMissile`, `MenuInterceptor`, `MenuExplosion` interfaces replacing flat `Particle`
+- **Trail rendering:** Two-pass (glow + sharp) per segment, 30-40 point trail history
+- **Spawn rates:** Missile every 0.6s, interceptor every 0.4s (sometimes 2), entity caps (50/60/25)
+- **Kept unchanged:** Stars, grid, scan band, blips, backdrop phosphor haze
+
+### MainMenu.tsx — Cycling Terminal
+- **3-phase state machine:** Boot (280ms/line, 5 lines) → Transition (1.5s pause) → Cycling (indefinite)
+- **15 terminal screens:** System diagnostics, threat analysis, interceptor status, weather, personnel log, network topology, ballistic computation, SIGINT intercept, memory subsystem, duty officer notes, radar calibration, supply chain, training exercise, comm channels, early warning network
+- **Typewriter effect:** 18ms per character, 120ms line pause, 3.5s hold after full screen
+- **Shuffled order:** Fisher-Yates shuffle after each complete cycle through all 15 screens
+- **Easter eggs:** "ANTHROPIC-MK7 CORE", "CLAUDE-IV", "CPT. HAIKU", "LT. SONNET", "SGT. CLAUDE", "CLASSIFICATION: OPUS", "CONSTITUTIONAL (AES-512)", "CONTEXT WINDOW: 200K TOKENS", "ATTENTION HEADS: 128", "ACKNOWLEDGE WITH ARTIFACT", "TRAINING DATA", "ALIGNMENT VERIFICATION", WarGames quote
+
+### MainMenu.module.css — New Styles
+- `.terminalHeader` — cyan, 11px, letter-spacing 1.5px
+- `.terminalLine` — dim-text, 11px, `white-space: pre` for dot-leader alignment
+- `.terminalCursor` — cyan blinking underscore (0.7s)
+- `.bootPanel` min-height increased from 90px to 180px for longer screens
+
+### Milestone Verification
+- `npx tsc --noEmit` — ✅ 0 type errors
+- `npm run build` (tsc + vite) — ✅ passes
+- `cargo test` — 140/141 (1 pre-existing physics test failure unrelated to frontend)
+- `cargo tauri dev` — visually confirm: ballistic arcs, thrust interceptors, MIRV splits, cycling terminal, CRT filter
+
+---
+
+## Phase 8C: Next Steps
 **Status:** Not started
 **Potential:** Difficulty tuning, more visual polish, particle effects, score tracking, game over screen, tutorial
 

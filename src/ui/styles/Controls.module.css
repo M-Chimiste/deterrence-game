@@ -130,9 +130,11 @@
 .sliderLabel {
   text-transform: uppercase;
   white-space: nowrap;
+  min-width: 60px;
 }
 
 .slider input[type="range"] {
-  width: 180px;
+  flex: 1;
+  min-width: 80px;
   accent-color: var(--neon-cyan);
 }

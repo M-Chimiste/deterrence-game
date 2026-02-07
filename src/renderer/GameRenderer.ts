@@ -177,6 +177,7 @@ export class GameRenderer {
     registerGameActions({
       setMuted: (muted) => this.setMuted(muted, true),
       setVolume: (volume) => this.setVolume(volume),
+      setSfxVolume: (volume) => this.setSfxVolume(volume),
       setMusicVolume: (volume) => this.setMusicVolume(volume),
       playUiClick: () => this.playUiClick(),
       handleStrategicAction: (action) => this.inputManager.handleStrategicAction(action),
@@ -247,6 +248,7 @@ export class GameRenderer {
       this.audio.toggleMute();
     }
     this.audio.setVolume(settings.volume);
+    this.audio.setSfxVolume(settings.sfxVolume ?? 0.8);
     this.audio.setMusicVolume(settings.musicVolume ?? 0.7);
     this.store.getState().setHud({ muted: this.audio.muted });
 
@@ -423,6 +425,10 @@ export class GameRenderer {
 
   private setVolume(volume: number) {
     this.audio.setVolume(volume);
+  }
+
+  private setSfxVolume(volume: number) {
+    this.audio.setSfxVolume(volume);
   }
 
   private setMusicVolume(volume: number) {

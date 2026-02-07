@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { setFullscreen, setWindowResolution } from "../../bridge/commands";
 import { useGameStore } from "../store";
-import { playUiClick, setMuted, setVolume, setMusicVolume } from "../gameActions";
+import { playUiClick, setMuted, setVolume, setSfxVolume, setMusicVolume } from "../gameActions";
 import { NeonButton } from "./controls/NeonButton";
 import { NeonToggle } from "./controls/NeonToggle";
 import { NeonSlider } from "./controls/NeonSlider";
@@ -89,12 +89,22 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               setHud({ muted: !checked });
             }}
           />
+        </div>
+        <div className={styles.volumeRow}>
           <NeonSlider
-            label="Volume"
+            label="Master"
             value={settings.volume}
             onChange={(value) => {
               updateSettings({ volume: value });
               setVolume(value);
+            }}
+          />
+          <NeonSlider
+            label="SFX"
+            value={settings.sfxVolume}
+            onChange={(value) => {
+              updateSettings({ sfxVolume: value });
+              setSfxVolume(value);
             }}
           />
           <NeonSlider

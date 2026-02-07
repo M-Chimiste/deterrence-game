@@ -24,6 +24,7 @@ export class AudioManager {
   private music: MusicManager | null = null;
   private _muted: boolean = false;
   private _volume: number = 0.5;
+  private _sfxVolume: number = 0.8;
   private _musicVolume: number = 0.7;
 
   /** Ensure AudioContext exists (must be called after user gesture) */
@@ -35,7 +36,7 @@ export class AudioManager {
       this.masterGain.connect(this.ctx.destination);
 
       this.effectsGain = this.ctx.createGain();
-      this.effectsGain.gain.value = 1.0;
+      this.effectsGain.gain.value = this._sfxVolume;
       this.effectsGain.connect(this.masterGain);
 
       this.ambientGain = this.ctx.createGain();
@@ -168,6 +169,14 @@ export class AudioManager {
     this._volume = Math.max(0, Math.min(1, vol));
     if (this.masterGain && !this._muted) {
       this.masterGain.gain.value = this._volume;
+    }
+  }
+
+  /** Set sound effects volume independently from master */
+  setSfxVolume(vol: number) {
+    this._sfxVolume = Math.max(0, Math.min(1, vol));
+    if (this.effectsGain) {
+      this.effectsGain.gain.value = this._sfxVolume;
     }
   }
 
