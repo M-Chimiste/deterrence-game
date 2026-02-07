@@ -602,6 +602,10 @@ impl Simulation {
             let up = self.campaign.tech_tree.upgrades.get(itype).cloned().unwrap_or_default();
             for axis in &[UpgradeAxis::Thrust, UpgradeAxis::Yield, UpgradeAxis::Guidance] {
                 let level = up.level_for(*axis);
+                // Guidance requires yield level >= 1
+                if *axis == UpgradeAxis::Guidance && up.yield_level < 1 {
+                    continue;
+                }
                 if let Some(cost) = upgrades::upgrade_cost(*axis, level)
                     && self.campaign.resources >= cost
                 {

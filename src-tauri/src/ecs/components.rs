@@ -72,6 +72,8 @@ pub struct Interceptor {
     pub battery_id: u32,
     pub target_x: f32,
     pub target_y: f32,
+    /// Proximity fuse: auto-detonate when within this radius of any missile. 0.0 = disabled.
+    pub proximity_fuse_radius: f32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

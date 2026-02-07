@@ -92,7 +92,15 @@ pub struct InterceptorProfile {
     pub cross_section: f32,
     pub yield_force: f32,
     pub blast_radius: f32,
+    /// Proximity fuse radius — auto-detonate when this close to any missile.
+    /// 0.0 = disabled (detonate only at target point or on overshoot).
+    pub proximity_fuse_radius: f32,
 }
+
+/// Base proximity fuse radius at guidance level 1
+pub const GUIDANCE_BASE_RADIUS: f32 = 25.0;
+/// Additional radius per guidance level beyond 1
+pub const GUIDANCE_RADIUS_PER_LEVEL: f32 = 15.0;
 
 /// Sprint: very fast burn, short range, small blast (terminal defense)
 pub const SPRINT_THRUST: f32 = 900.0;
@@ -181,6 +189,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             cross_section: INTERCEPTOR_CROSS_SECTION,
             yield_force: WARHEAD_YIELD,
             blast_radius: WARHEAD_BLAST_RADIUS,
+            proximity_fuse_radius: 0.0,
         },
         InterceptorType::Sprint => InterceptorProfile {
             thrust: SPRINT_THRUST,
@@ -191,6 +200,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             cross_section: SPRINT_CROSS_SECTION,
             yield_force: SPRINT_YIELD,
             blast_radius: SPRINT_BLAST_RADIUS,
+            proximity_fuse_radius: 0.0,
         },
         InterceptorType::Exoatmospheric => InterceptorProfile {
             thrust: EXO_THRUST,
@@ -201,6 +211,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             cross_section: EXO_CROSS_SECTION,
             yield_force: EXO_YIELD,
             blast_radius: EXO_BLAST_RADIUS,
+            proximity_fuse_radius: 0.0,
         },
         InterceptorType::AreaDenial => InterceptorProfile {
             thrust: AREA_DENIAL_THRUST,
@@ -211,6 +222,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             cross_section: AREA_DENIAL_CROSS_SECTION,
             yield_force: AREA_DENIAL_YIELD,
             blast_radius: AREA_DENIAL_BLAST_RADIUS,
+            proximity_fuse_radius: 0.0,
         },
     }
 }

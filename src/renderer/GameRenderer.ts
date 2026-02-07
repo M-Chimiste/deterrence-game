@@ -186,11 +186,12 @@ export class GameRenderer {
       this.hud.updateMuteState(muted);
     };
 
-    // Listen for detonation events
+    // Listen for detonation events — scale visuals to yield
     onDetonation((event) => {
-      this.audio.playDetonation(event.x, Math.min(event.yield_force / 100, 2.0));
-      this.particleManager.spawnExplosion(event.x, event.y, Math.min(event.yield_force / 100, 2.0));
-      this.triggerScreenShake(Math.min(event.yield_force / 100, 2.0));
+      const intensity = Math.min(event.yield_force / 80, 3.0);
+      this.audio.playDetonation(event.x, intensity);
+      this.particleManager.spawnExplosion(event.x, event.y, intensity);
+      this.triggerScreenShake(intensity);
     });
 
     // Listen for impact events

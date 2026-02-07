@@ -53,6 +53,7 @@ fn setup_scenario(sim: &mut Simulation) {
         battery_id: 0,
         target_x: 300.0,
         target_y: 500.0,
+        proximity_fuse_radius: 0.0,
     });
     sim.world.markers[idx] = Some(EntityMarker {
         kind: EntityKind::Interceptor,

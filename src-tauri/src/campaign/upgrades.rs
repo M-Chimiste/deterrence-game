@@ -158,15 +158,23 @@ impl TechTree {
 
         match upgrades {
             None => base,
-            Some(u) => InterceptorProfile {
-                thrust: base.thrust * (1.0 + u.thrust_level as f32 * THRUST_UPGRADE_MULT),
-                burn_time: base.burn_time,
-                ceiling: base.ceiling,
-                mass: base.mass,
-                drag_coeff: base.drag_coeff,
-                cross_section: base.cross_section,
-                yield_force: base.yield_force,
-                blast_radius: base.blast_radius * (1.0 + u.yield_level as f32 * YIELD_UPGRADE_MULT),
+            Some(u) => {
+                let prox = if u.guidance_level > 0 {
+                    config::GUIDANCE_BASE_RADIUS + (u.guidance_level - 1) as f32 * config::GUIDANCE_RADIUS_PER_LEVEL
+                } else {
+                    0.0
+                };
+                InterceptorProfile {
+                    thrust: base.thrust * (1.0 + u.thrust_level as f32 * THRUST_UPGRADE_MULT),
+                    burn_time: base.burn_time,
+                    ceiling: base.ceiling,
+                    mass: base.mass,
+                    drag_coeff: base.drag_coeff,
+                    cross_section: base.cross_section,
+                    yield_force: base.yield_force,
+                    blast_radius: base.blast_radius * (1.0 + u.yield_level as f32 * YIELD_UPGRADE_MULT),
+                    proximity_fuse_radius: prox,
+                }
             },
         }
     }

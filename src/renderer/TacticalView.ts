@@ -3,7 +3,7 @@ import type { StateSnapshot, EntitySnapshot, EntityExtra } from "../types/snapsh
 import type { ArcPrediction } from "../types/commands";
 import {
   NEON_CYAN, HOT_PINK, NEON_GREEN, NEON_ORANGE, SOLAR_YELLOW,
-  MISSILE_BODY, MISSILE_CORE, MIRV_BODY, MIRV_CORE, GLOW_CONTACT,
+  MISSILE_BODY, MISSILE_CORE, MIRV_BODY, MIRV_CORE,
   MISSILE_TRAIL_DIM, TYPE_COLORS, TYPE_TRAIL_DIM, FONT_FAMILY,
 } from "./ui/Theme";
 
@@ -286,13 +286,9 @@ export class TacticalView {
           trailColor = MIRV_BODY;
           trailDimColor = 0x330011;
         }
-        if (!data.detected_by_radar && data.detected_by_glow) {
-          trailColor = GLOW_CONTACT;
-          trailDimColor = 0x331a00;
-          trailWidth = 0.5;
-        }
       }
-      this.drawTrailGlow(visual.trail, visual.trailPoints, trailColor, trailDimColor, trailWidth);
+      const isMissileTrail = entity.entity_type === "Missile";
+      this.drawTrailGlow(visual.trail, visual.trailPoints, trailColor, trailDimColor, trailWidth, isMissileTrail);
     }
 
     // Redraw the main graphic
@@ -323,9 +319,26 @@ export class TacticalView {
     color: number,
     _dimColor: number,
     widthBase: number,
+    smokeTrail: boolean = false,
   ) {
     g.clear();
     if (points.length < 2) return;
+
+    // Smoke pass for missiles — soft expanding puffs along the trail
+    if (smokeTrail && points.length > 3) {
+      // Use a seeded pseudo-random based on point positions for consistent jitter
+      for (let i = 2; i < points.length; i += 2) {
+        const t = i / points.length; // 0..1, older→newer
+        const age = 1 - t; // older trail points = more expanded smoke
+        const radius = 3 + age * 10; // smoke expands as it ages
+        const alpha = t * 0.06 * (1 - age * 0.5); // fades for older parts
+        // Slight jitter offset for organic feel
+        const jx = Math.sin(i * 7.3 + points[i].y * 0.1) * (2 + age * 4);
+        const jy = Math.cos(i * 5.1 + points[i].x * 0.1) * (2 + age * 4);
+        g.circle(points[i].x + jx, points[i].y + jy, radius);
+        g.fill({ color, alpha });
+      }
+    }
 
     // Glow pass (wider, dimmer)
     for (let i = 1; i < points.length; i++) {
@@ -348,23 +361,12 @@ export class TacticalView {
 
   private drawMissile(g: Graphics, x: number, y: number, extra: EntityExtra | null) {
     let isMirv = false;
-    let byRadar = true;
-    let byGlow = false;
     if (extra && "Missile" in extra) {
       const data = (extra as { Missile: { is_mirv: boolean; detected_by_radar: boolean; detected_by_glow: boolean } }).Missile;
       isMirv = data.is_mirv;
-      byRadar = data.detected_by_radar;
-      byGlow = data.detected_by_glow;
     }
 
-    if (!byRadar && byGlow) {
-      // Glow-only contact: dim pulsing orange dot
-      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.005);
-      g.circle(x, y, 5);
-      g.fill({ color: GLOW_CONTACT, alpha: 0.1 * pulse });
-      g.circle(x, y, 3);
-      g.fill({ color: GLOW_CONTACT, alpha: 0.3 + 0.4 * pulse });
-    } else if (isMirv) {
+    if (isMirv) {
       // MIRV carrier: larger, glow + body + core
       g.circle(x, y, 10);
       g.fill({ color: MIRV_BODY, alpha: 0.12 });

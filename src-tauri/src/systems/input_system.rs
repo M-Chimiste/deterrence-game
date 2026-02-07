@@ -90,6 +90,7 @@ pub fn run(world: &mut World, commands: &mut Vec<PlayerCommand>, battery_ids: &[
                     battery_id,
                     target_x,
                     target_y,
+                    proximity_fuse_radius: profile.proximity_fuse_radius,
                 });
 
                 world.ballistics[idx] = Some(Ballistic {

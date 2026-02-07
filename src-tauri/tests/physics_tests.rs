@@ -82,6 +82,7 @@ fn spawn_interceptor(
         battery_id: 0,
         target_x,
         target_y,
+        proximity_fuse_radius: 0.0,
     });
     world.markers[idx] = Some(EntityMarker {
         kind: EntityKind::Interceptor,

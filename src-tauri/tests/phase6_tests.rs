@@ -252,6 +252,7 @@ fn spawn_interceptor_entity(world: &mut World, x: f32, y: f32, vx: f32, vy: f32)
         battery_id: 0,
         target_x: x,
         target_y: y,
+        proximity_fuse_radius: 0.0,
     });
     world.warheads[idx] = Some(Warhead {
         yield_force: config::WARHEAD_YIELD,

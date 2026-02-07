@@ -44,6 +44,24 @@ pub fn run(world: &mut World, tick: u64) -> DetonationResult {
 
                 let mut should_detonate = dist_sq < proximity * proximity;
 
+                // Proximity fuse: auto-detonate when near any enemy missile
+                if !should_detonate && interceptor.proximity_fuse_radius > 0.0 {
+                    let fuse_sq = interceptor.proximity_fuse_radius * interceptor.proximity_fuse_radius;
+                    for &midx in world.alive_entities().iter() {
+                        if let Some(m) = &world.markers[midx]
+                            && m.kind == EntityKind::Missile
+                            && let Some(mt) = &world.transforms[midx]
+                        {
+                            let mx = transform.x - mt.x;
+                            let my = transform.y - mt.y;
+                            if mx * mx + my * my < fuse_sq {
+                                should_detonate = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 // If post-burn, check if moving away from target (overshoot)
                 if !should_detonate
                     && interceptor.burn_remaining <= 0.0

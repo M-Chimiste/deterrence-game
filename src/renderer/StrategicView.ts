@@ -24,12 +24,15 @@ interface RegionVisual {
 
 export class StrategicView {
   private container: Container;
+  private regionsLayer: Container; // Bottom layer: adjacency lines + region circles
+  private uiLayer: Container;     // Top layer: panel, actions, HUD text, intel
   private regionVisuals: Map<number, RegionVisual> = new Map();
   private adjacencyLines: Graphics;
   private titleText: Text;
   private resourceText: Text;
   private waveText: Text;
   private incomeText: Text;
+  private actionsPanelBg: Graphics;
   private actionsContainer: Container;
   private actionButtons: NeonButton[] = [];
   private actionTickables: NeonButton[] = [];
@@ -46,9 +49,17 @@ export class StrategicView {
     this.container.visible = false;
     app.stage.addChild(this.container);
 
-    // Adjacency lines (behind regions)
+    // Bottom layer: regions + adjacency lines (renders behind everything)
+    this.regionsLayer = new Container();
+    this.container.addChild(this.regionsLayer);
+
+    // Top layer: UI panel, actions, HUD text (always above regions)
+    this.uiLayer = new Container();
+    this.container.addChild(this.uiLayer);
+
+    // Adjacency lines (in regions layer, behind region circles)
     this.adjacencyLines = new Graphics();
-    this.container.addChild(this.adjacencyLines);
+    this.regionsLayer.addChild(this.adjacencyLines);
 
     // Title
     this.titleText = new Text({
@@ -63,7 +74,7 @@ export class StrategicView {
     this.titleText.anchor.set(0.5, 0);
     this.titleText.x = WORLD_WIDTH / 2;
     this.titleText.y = 12;
-    this.container.addChild(this.titleText);
+    this.uiLayer.addChild(this.titleText);
 
     // Resources display
     this.resourceText = new Text({
@@ -76,7 +87,7 @@ export class StrategicView {
     });
     this.resourceText.x = 20;
     this.resourceText.y = 12;
-    this.container.addChild(this.resourceText);
+    this.uiLayer.addChild(this.resourceText);
 
     // Wave number
     this.waveText = new Text({
@@ -90,7 +101,7 @@ export class StrategicView {
     this.waveText.anchor.set(1, 0);
     this.waveText.x = WORLD_WIDTH - 20;
     this.waveText.y = 12;
-    this.container.addChild(this.waveText);
+    this.uiLayer.addChild(this.waveText);
 
     // Wave income notification
     this.incomeText = new Text({
@@ -103,13 +114,24 @@ export class StrategicView {
     });
     this.incomeText.x = 20;
     this.incomeText.y = 34;
-    this.container.addChild(this.incomeText);
+    this.uiLayer.addChild(this.incomeText);
 
-    // Actions panel (right side)
+    // Actions panel background (dark panel on right side)
+    const panelX = WORLD_WIDTH - 370;
+    const panelWidth = 360;
+    this.actionsPanelBg = new Graphics();
+    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, WORLD_HEIGHT - 100);
+    this.actionsPanelBg.fill({ color: PANEL_DARK, alpha: 0.92 });
+    this.actionsPanelBg.setStrokeStyle({ width: 1, color: NEON_CYAN, alpha: 0.15 });
+    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, WORLD_HEIGHT - 100);
+    this.actionsPanelBg.stroke();
+    this.uiLayer.addChild(this.actionsPanelBg);
+
+    // Actions panel (right side, on top of background)
     this.actionsContainer = new Container();
-    this.actionsContainer.x = WORLD_WIDTH - 380;
+    this.actionsContainer.x = panelX;
     this.actionsContainer.y = 80;
-    this.container.addChild(this.actionsContainer);
+    this.uiLayer.addChild(this.actionsContainer);
 
     // Intel briefing (bottom)
     this.intelText = new Text({
@@ -125,7 +147,7 @@ export class StrategicView {
     this.intelText.anchor.set(0, 1);
     this.intelText.x = 20;
     this.intelText.y = WORLD_HEIGHT - 16;
-    this.container.addChild(this.intelText);
+    this.uiLayer.addChild(this.intelText);
 
     // Ticker for button animations
     app.ticker.add((ticker) => {
@@ -169,7 +191,7 @@ export class StrategicView {
       if (!visual) {
         visual = this.createRegionVisual(region);
         this.regionVisuals.set(region.id, visual);
-        this.container.addChild(visual.container);
+        this.regionsLayer.addChild(visual.container);
       }
       this.updateRegionVisual(visual, region);
     }
@@ -391,9 +413,20 @@ export class StrategicView {
       this.actionsContainer.addChild(btn);
       this.actionButtons.push(btn);
       this.actionTickables.push(btn);
-      y += isStartWave ? 48 : 38;
+      y += isStartWave ? 48 : 36;
       actionIndex++;
     }
+
+    // Resize panel background to fit content
+    const panelX = WORLD_WIDTH - 370;
+    const panelWidth = 360;
+    const panelHeight = y + 40;
+    this.actionsPanelBg.clear();
+    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, panelHeight);
+    this.actionsPanelBg.fill({ color: PANEL_DARK, alpha: 0.92 });
+    this.actionsPanelBg.setStrokeStyle({ width: 1, color: NEON_CYAN, alpha: 0.15 });
+    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, panelHeight);
+    this.actionsPanelBg.stroke();
   }
 
   private formatAction(action: AvailableAction): {
