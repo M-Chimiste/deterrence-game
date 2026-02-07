@@ -28,8 +28,10 @@ void main(void) {
 
 export class CRTFilter extends Filter {
   private _time: number = 0;
+  private _resolution: Float32Array;
 
   constructor(width: number, height: number) {
+    const resolution = new Float32Array([width, height]);
     const glProgram = GlProgram.from({
       vertex: defaultVertex,
       fragment: crtFragmentShader,
@@ -40,17 +42,25 @@ export class CRTFilter extends Filter {
       resources: {
         crtUniforms: {
           uTime: { value: 0, type: "f32" },
-          uResolution: { value: new Float32Array([width, height]), type: "vec2<f32>" },
+          uResolution: { value: resolution, type: "vec2<f32>" },
           uScanlineIntensity: { value: 0.15, type: "f32" },
         },
       },
     });
+
+    this._resolution = resolution;
   }
 
   /** Advance time uniform for animated effects */
   update(deltaTime: number) {
     this._time += deltaTime * 0.016; // normalize to ~seconds
     this.resources.crtUniforms.uniforms.uTime = this._time;
+  }
+
+  setResolution(width: number, height: number) {
+    this._resolution[0] = width;
+    this._resolution[1] = height;
+    this.resources.crtUniforms.uniforms.uResolution = this._resolution;
   }
 
   set scanlineIntensity(value: number) {

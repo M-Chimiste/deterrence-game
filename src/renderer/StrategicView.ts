@@ -1,17 +1,9 @@
 import { Application, Container, Graphics, Text, TextStyle } from "pixi.js";
-import type {
-  CampaignSnapshot,
-  RegionSnapshot,
-  AvailableAction,
-} from "../types/campaign";
-import { NeonButton } from "./ui/NeonButton";
+import type { CampaignSnapshot, RegionSnapshot } from "../types/campaign";
 import {
   NEON_CYAN, NEON_GREEN, SOLAR_YELLOW, DIM_TEXT,
   HOT_PINK, PANEL_DARK, FONT_FAMILY,
 } from "./ui/Theme";
-
-const WORLD_WIDTH = 1280;
-const WORLD_HEIGHT = 720;
 
 const REGION_RADIUS = 60;
 
@@ -25,24 +17,9 @@ interface RegionVisual {
 export class StrategicView {
   private container: Container;
   private regionsLayer: Container; // Bottom layer: adjacency lines + region circles
-  private uiLayer: Container;     // Top layer: panel, actions, HUD text, intel
   private regionVisuals: Map<number, RegionVisual> = new Map();
   private adjacencyLines: Graphics;
-  private titleText: Text;
-  private resourceText: Text;
-  private waveText: Text;
-  private incomeText: Text;
-  private actionsPanelBg: Graphics;
-  private actionsContainer: Container;
-  private actionButtons: NeonButton[] = [];
-  private actionTickables: NeonButton[] = [];
-  private intelText: Text;
   private snapshot: CampaignSnapshot | null = null;
-
-  /** Callback when user clicks an action */
-  onActionClick:
-    | ((action: AvailableAction, index: number) => void)
-    | null = null;
 
   constructor(app: Application) {
     this.container = new Container();
@@ -53,110 +30,9 @@ export class StrategicView {
     this.regionsLayer = new Container();
     this.container.addChild(this.regionsLayer);
 
-    // Top layer: UI panel, actions, HUD text (always above regions)
-    this.uiLayer = new Container();
-    this.container.addChild(this.uiLayer);
-
     // Adjacency lines (in regions layer, behind region circles)
     this.adjacencyLines = new Graphics();
     this.regionsLayer.addChild(this.adjacencyLines);
-
-    // Title
-    this.titleText = new Text({
-      text: "STRATEGIC COMMAND",
-      style: new TextStyle({
-        fontFamily: FONT_FAMILY,
-        fontSize: 22,
-        fill: NEON_CYAN,
-        fontWeight: "bold",
-      }),
-    });
-    this.titleText.anchor.set(0.5, 0);
-    this.titleText.x = WORLD_WIDTH / 2;
-    this.titleText.y = 12;
-    this.uiLayer.addChild(this.titleText);
-
-    // Resources display
-    this.resourceText = new Text({
-      text: "RESOURCES: ---",
-      style: new TextStyle({
-        fontFamily: FONT_FAMILY,
-        fontSize: 16,
-        fill: SOLAR_YELLOW,
-      }),
-    });
-    this.resourceText.x = 20;
-    this.resourceText.y = 12;
-    this.uiLayer.addChild(this.resourceText);
-
-    // Wave number
-    this.waveText = new Text({
-      text: "",
-      style: new TextStyle({
-        fontFamily: FONT_FAMILY,
-        fontSize: 16,
-        fill: NEON_CYAN,
-      }),
-    });
-    this.waveText.anchor.set(1, 0);
-    this.waveText.x = WORLD_WIDTH - 20;
-    this.waveText.y = 12;
-    this.uiLayer.addChild(this.waveText);
-
-    // Wave income notification
-    this.incomeText = new Text({
-      text: "",
-      style: new TextStyle({
-        fontFamily: FONT_FAMILY,
-        fontSize: 14,
-        fill: SOLAR_YELLOW,
-      }),
-    });
-    this.incomeText.x = 20;
-    this.incomeText.y = 34;
-    this.uiLayer.addChild(this.incomeText);
-
-    // Actions panel background (dark panel on right side)
-    const panelX = WORLD_WIDTH - 370;
-    const panelWidth = 360;
-    this.actionsPanelBg = new Graphics();
-    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, WORLD_HEIGHT - 100);
-    this.actionsPanelBg.fill({ color: PANEL_DARK, alpha: 0.92 });
-    this.actionsPanelBg.setStrokeStyle({ width: 1, color: NEON_CYAN, alpha: 0.15 });
-    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, WORLD_HEIGHT - 100);
-    this.actionsPanelBg.stroke();
-    this.uiLayer.addChild(this.actionsPanelBg);
-
-    // Actions panel (right side, on top of background)
-    this.actionsContainer = new Container();
-    this.actionsContainer.x = panelX;
-    this.actionsContainer.y = 80;
-    this.uiLayer.addChild(this.actionsContainer);
-
-    // Intel briefing (bottom)
-    this.intelText = new Text({
-      text: "",
-      style: new TextStyle({
-        fontFamily: FONT_FAMILY,
-        fontSize: 13,
-        fill: DIM_TEXT,
-        wordWrap: true,
-        wordWrapWidth: WORLD_WIDTH - 40,
-      }),
-    });
-    this.intelText.anchor.set(0, 1);
-    this.intelText.x = 20;
-    this.intelText.y = WORLD_HEIGHT - 16;
-    this.uiLayer.addChild(this.intelText);
-
-    // Ticker for button animations
-    app.ticker.add((ticker) => {
-      if (this.container.visible) {
-        for (const btn of this.actionTickables) {
-          btn.tick(ticker.deltaTime);
-        }
-      }
-    });
   }
 
   get visible(): boolean {
@@ -169,18 +45,6 @@ export class StrategicView {
 
   update(snapshot: CampaignSnapshot) {
     this.snapshot = snapshot;
-
-    this.resourceText.text = `RESOURCES: $${snapshot.resources}`;
-    this.waveText.text =
-      snapshot.wave_number > 0
-        ? `WAVES SURVIVED: ${snapshot.wave_number}`
-        : "WAVE: FIRST DEPLOYMENT";
-
-    if (snapshot.wave_income != null) {
-      this.incomeText.text = `+${snapshot.wave_income} INCOME FROM SURVIVING CITIES`;
-    } else {
-      this.incomeText.text = "";
-    }
 
     // Draw adjacency lines
     this.drawAdjacencyLines(snapshot.regions);
@@ -196,24 +60,6 @@ export class StrategicView {
       this.updateRegionVisual(visual, region);
     }
 
-    // Update actions panel
-    this.updateActions(snapshot.available_actions, snapshot.resources);
-
-    // Intel briefing
-    const owned = snapshot.regions.filter((r) => r.owned);
-    const totalCities = owned.reduce((s, r) => s + r.cities.length, 0);
-    const totalBatteries = owned.reduce(
-      (s, r) => s + r.battery_slots.filter((b) => b.occupied).length,
-      0
-    );
-    const emptySlots = owned.reduce(
-      (s, r) => s + r.battery_slots.filter((b) => !b.occupied).length,
-      0
-    );
-    this.intelText.text =
-      `INTEL: ${owned.length} regions secured | ${totalCities} cities | ` +
-      `${totalBatteries} batteries deployed | ${emptySlots} open slots | ` +
-      `ENTER=Start Wave | F5=Quick Save | F9=Quick Load`;
   }
 
   private drawAdjacencyLines(regions: RegionSnapshot[]) {
@@ -358,121 +204,6 @@ export class StrategicView {
       visual.details.style.fill = DIM_TEXT;
       visual.label.style.fill = DIM_TEXT;
     }
-  }
-
-  private updateActions(actions: AvailableAction[], resources: number) {
-    // Clear old buttons
-    for (const btn of this.actionButtons) {
-      this.actionsContainer.removeChild(btn);
-      btn.destroy({ children: true });
-    }
-    this.actionButtons = [];
-    this.actionTickables = [];
-
-    // Section header
-    const headerStyle = new TextStyle({
-      fontFamily: FONT_FAMILY,
-      fontSize: 14,
-      fill: NEON_CYAN,
-      fontWeight: "bold",
-    });
-
-    const header = new Text({ text: "AVAILABLE ACTIONS", style: headerStyle });
-    header.y = 0;
-    // Header is a Text, not a button, add directly
-    const headerContainer = new Container();
-    headerContainer.addChild(header);
-    this.actionsContainer.addChild(headerContainer as unknown as NeonButton);
-    // We'll track it separately since it's not a NeonButton
-    this.actionButtons.push(headerContainer as unknown as NeonButton);
-
-    let y = 30;
-    let actionIndex = 0;
-    for (const action of actions) {
-      const { label, cost } = this.formatAction(action);
-      const affordable = cost === 0 || resources >= cost;
-
-      const isStartWave = action === "StartWave";
-      const btnColor = isStartWave ? NEON_GREEN : affordable ? NEON_CYAN : HOT_PINK;
-
-      const btn = new NeonButton({
-        label,
-        width: 340,
-        height: isStartWave ? 40 : 32,
-        fontSize: isStartWave ? 16 : 12,
-        color: btnColor,
-        disabled: !affordable,
-        onClick: () => {
-          this.onActionClick?.(action, idx);
-        },
-      });
-
-      const idx = actionIndex;
-      btn.x = 170; // Center in 340px width
-      btn.y = y + (isStartWave ? 20 : 16);
-      this.actionsContainer.addChild(btn);
-      this.actionButtons.push(btn);
-      this.actionTickables.push(btn);
-      y += isStartWave ? 48 : 36;
-      actionIndex++;
-    }
-
-    // Resize panel background to fit content
-    const panelX = WORLD_WIDTH - 370;
-    const panelWidth = 360;
-    const panelHeight = y + 40;
-    this.actionsPanelBg.clear();
-    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, panelHeight);
-    this.actionsPanelBg.fill({ color: PANEL_DARK, alpha: 0.92 });
-    this.actionsPanelBg.setStrokeStyle({ width: 1, color: NEON_CYAN, alpha: 0.15 });
-    this.actionsPanelBg.rect(panelX - 10, 55, panelWidth + 20, panelHeight);
-    this.actionsPanelBg.stroke();
-  }
-
-  private formatAction(action: AvailableAction): {
-    label: string;
-    cost: number;
-  } {
-    if (action === "StartWave") {
-      return { label: "START WAVE", cost: 0 };
-    }
-    if ("ExpandRegion" in action) {
-      const { region_id, cost } = action.ExpandRegion;
-      const name =
-        this.snapshot?.regions.find((r) => r.id === region_id)?.name ??
-        `Region ${region_id}`;
-      return { label: `EXPAND: ${name} ($${cost})`, cost };
-    }
-    if ("PlaceBattery" in action) {
-      const { region_id, cost } = action.PlaceBattery;
-      const name =
-        this.snapshot?.regions.find((r) => r.id === region_id)?.name ??
-        `Region ${region_id}`;
-      return { label: `PLACE BATTERY: ${name} ($${cost})`, cost };
-    }
-    if ("RestockBattery" in action) {
-      const { region_id, cost } = action.RestockBattery;
-      const name =
-        this.snapshot?.regions.find((r) => r.id === region_id)?.name ??
-        `Region ${region_id}`;
-      return { label: `RESTOCK: ${name} ($${cost})`, cost };
-    }
-    if ("RepairCity" in action) {
-      const { region_id, cost } = action.RepairCity;
-      const name =
-        this.snapshot?.regions.find((r) => r.id === region_id)?.name ??
-        `Region ${region_id}`;
-      return { label: `REPAIR CITY: ${name} ($${cost})`, cost };
-    }
-    if ("UnlockInterceptor" in action) {
-      const { interceptor_type, cost } = action.UnlockInterceptor;
-      return { label: `UNLOCK: ${interceptor_type} ($${cost})`, cost };
-    }
-    if ("UpgradeInterceptor" in action) {
-      const { interceptor_type, axis, cost, current_level } = action.UpgradeInterceptor;
-      return { label: `UPGRADE: ${interceptor_type} ${axis} Lv${current_level + 1} ($${cost})`, cost };
-    }
-    return { label: "UNKNOWN", cost: 0 };
   }
 
   /** Get the region at a map position (for click handling) */

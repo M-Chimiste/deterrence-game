@@ -4,6 +4,7 @@ import {
   createCityDamageSound,
   createWaveChime,
   createMirvSplitSound,
+  createUiClickSound,
 } from "./SoundSynth";
 
 const WORLD_WIDTH = 1280;
@@ -97,6 +98,13 @@ export class AudioManager {
     const ctx = this.ensureContext();
     const panner = this.panFromWorldX(worldX);
     createMirvSplitSound(ctx, panner);
+  }
+
+  /** UI click sound (non-spatial) */
+  playUiClick() {
+    if (this._muted) return;
+    const ctx = this.ensureContext();
+    createUiClickSound(ctx, this.effectsGain!);
   }
 
   /** Start low ambient hum, modulated by weather */

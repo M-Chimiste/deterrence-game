@@ -121,3 +121,20 @@ export function createMirvSplitSound(ctx: AudioContext, dest: AudioNode): void {
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + 0.12);
 }
+
+/** Short UI click — high blip */
+export function createUiClickSound(ctx: AudioContext, dest: AudioNode): void {
+  const osc = ctx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(800, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(420, ctx.currentTime + 0.06);
+
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0.18, ctx.currentTime);
+  env.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+
+  osc.connect(env);
+  env.connect(dest);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.08);
+}

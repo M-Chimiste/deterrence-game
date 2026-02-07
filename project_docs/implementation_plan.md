@@ -27,7 +27,7 @@ Design docs: [project_brief.md](project_brief.md), [product_context.md](product_
 - `src/main.ts` — bootstrap PixiJS Application (black canvas), register Tauri event listener, invoke ping
 - `src/bridge/commands.ts` — typed invoke wrapper
 - `src/bridge/events.ts` — typed event listener
-- `src/types/snapshot.ts`, `src/types/commands.ts`, `src/types/events.ts` — placeholder interfaces
+- `src/types/snapshot.ts`, `src/types/commands.ts`, `src/types/events.ts` — interfaces
 
 ### Milestone
 - `cargo test && cargo clippy && npm run build` all pass

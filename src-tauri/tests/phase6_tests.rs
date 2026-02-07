@@ -14,7 +14,10 @@ fn standard_profile_matches_existing_constants() {
     assert_eq!(profile.thrust, config::INTERCEPTOR_THRUST);
     assert_eq!(profile.burn_time, config::INTERCEPTOR_BURN_TIME);
     assert_eq!(profile.mass, config::INTERCEPTOR_MASS);
-    assert_eq!(profile.blast_radius, config::WARHEAD_BLAST_RADIUS);
+    assert_eq!(
+        profile.blast_radius,
+        config::WARHEAD_BLAST_RADIUS * config::INTERCEPTOR_BLAST_RADIUS_MULT
+    );
 }
 
 #[test]

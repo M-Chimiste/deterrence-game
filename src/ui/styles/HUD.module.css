@@ -1,0 +1,85 @@
+.hudRoot {
+  position: absolute;
+  inset: 0;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  font-size: 14px;
+}
+
+.left,
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wave {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--neon-cyan);
+}
+
+.line {
+  color: var(--neon-cyan);
+}
+
+.lineMuted {
+  color: var(--dim-text);
+  font-size: 12px;
+}
+
+.cities {
+  font-size: 14px;
+}
+
+.cities[data-tone="good"] {
+  color: var(--neon-green);
+}
+
+.cities[data-tone="warn"] {
+  color: var(--neon-orange);
+}
+
+.cities[data-tone="danger"] {
+  color: var(--hot-pink);
+}
+
+.resources {
+  color: var(--solar-yellow);
+  font-size: 14px;
+}
+
+.line[data-tone="warn"] {
+  color: var(--solar-yellow);
+}
+
+.line[data-tone="danger"] {
+  color: var(--hot-pink);
+}
+
+.waveComplete {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.wavePanel {
+  background: rgba(5, 10, 18, 0.92);
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  padding: 20px 26px;
+  min-width: 360px;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.12);
+}
+
+.waveLine {
+  font-size: 14px;
+  line-height: 1.4;
+  min-height: 1.4em;
+}

@@ -32,6 +32,18 @@ interface BatteryPosition {
   y: number;
 }
 
+interface BatterySlotMap {
+  regionId: number;
+  slotIndex: number;
+  x: number;
+  y: number;
+}
+
+interface CityMapEntry {
+  regionId: number;
+  cityIndex: number;
+}
+
 export class InputManager {
   private app: Application;
   private worldWidth: number;
@@ -47,6 +59,8 @@ export class InputManager {
     { x: 160, y: GROUND_Y },
     { x: 1120, y: GROUND_Y },
   ];
+  private batterySlotIndex: BatterySlotMap[] = [];
+  private cityIndexMap: CityMapEntry[] = [];
 
   /** Callback invoked with arc prediction results (or null to clear). */
   onArcUpdate: ((prediction: ArcPrediction | null) => void) | null = null;
@@ -57,14 +71,17 @@ export class InputManager {
   /** Callback invoked when selected interceptor type changes. */
   onTypeChange: ((typeName: string) => void) | null = null;
 
-  /** Callback invoked when CRT filter is toggled. */
-  onCRTToggle: (() => void) | null = null;
+  /** Callback invoked when strategic map hover changes. */
+  onMapHover: ((mapX: number, mapY: number) => void) | null = null;
 
   /** Callback invoked on interceptor launch (for audio). */
   onLaunchSound: ((worldX: number) => void) | null = null;
 
   /** Callback invoked when mute is toggled. */
   onMuteToggle: (() => void) | null = null;
+
+  /** Callback invoked when fullscreen state changes. */
+  onFullscreenChange: ((fullscreen: boolean) => void) | null = null;
 
   constructor(app: Application, worldWidth: number, worldHeight: number) {
     this.app = app;
@@ -113,20 +130,39 @@ export class InputManager {
   /** Update battery positions and tech tree from campaign state */
   updateBatteryPositions(campaign: CampaignSnapshot) {
     const positions: BatteryPosition[] = [];
-    for (const region of campaign.regions) {
-      if (!region.owned) continue;
-      for (const slot of region.battery_slots) {
-        if (slot.occupied) {
-          positions.push({ x: slot.x, y: slot.y });
-        }
+    const batteryMap: BatterySlotMap[] = [];
+    const cityMap: CityMapEntry[] = [];
+    const regionById = new Map(campaign.regions.map((region) => [region.id, region]));
+    const ownedIds =
+      campaign.owned_region_ids.length > 0
+        ? campaign.owned_region_ids
+        : campaign.regions.filter((region) => region.owned).map((region) => region.id);
+
+    for (const rid of ownedIds) {
+      const region = regionById.get(rid);
+      if (!region || !region.owned) continue;
+      for (let i = 0; i < region.cities.length; i++) {
+        cityMap.push({ regionId: region.id, cityIndex: i });
+      }
+      for (let i = 0; i < region.battery_slots.length; i++) {
+        const slot = region.battery_slots[i];
+        if (!slot.occupied) continue;
+        positions.push({ x: slot.x, y: slot.y });
+        batteryMap.push({ regionId: region.id, slotIndex: i, x: slot.x, y: slot.y });
       }
     }
-    if (positions.length > 0) {
-      this.batteryPositions = positions.sort((a, b) => a.x - b.x);
-    }
+
+    this.batteryPositions = positions;
+    this.batterySlotIndex = batteryMap;
+    this.cityIndexMap = cityMap;
+
     // Clamp selected battery
+    const prevSelected = this._selectedBattery;
     if (this._selectedBattery >= this.batteryPositions.length) {
       this._selectedBattery = 0;
+    }
+    if (prevSelected !== this._selectedBattery) {
+      this.onBatteryChange?.(this._selectedBattery);
     }
     // Update unlocked types from tech tree
     if (campaign.tech_tree) {
@@ -153,10 +189,21 @@ export class InputManager {
         action.PlaceBattery.slot_index
       );
     } else if ("RestockBattery" in action) {
-      // Find battery index from region/slot info
-      restockBattery(this.findBatteryIndex(action.RestockBattery.region_id, action.RestockBattery.slot_index));
+      const batteryIndex = this.findBatteryIndex(
+        action.RestockBattery.region_id,
+        action.RestockBattery.slot_index
+      );
+      if (batteryIndex >= 0) {
+        restockBattery(batteryIndex);
+      }
     } else if ("RepairCity" in action) {
-      repairCity(this.findCityIndex(action.RepairCity.region_id, action.RepairCity.city_index));
+      const cityIndex = this.findCityIndex(
+        action.RepairCity.region_id,
+        action.RepairCity.city_index
+      );
+      if (cityIndex >= 0) {
+        repairCity(cityIndex);
+      }
     } else if ("UnlockInterceptor" in action) {
       unlockInterceptor(action.UnlockInterceptor.interceptor_type);
     } else if ("UpgradeInterceptor" in action) {
@@ -164,15 +211,20 @@ export class InputManager {
     }
   }
 
-  private findBatteryIndex(_regionId: number, _slotIndex: number): number {
-    // For now, use the global battery index (batteries are sorted by x)
-    // This matches the backend's battery_ids ordering
-    // TODO: more precise mapping if needed
-    return 0;
+  getBatteryPosition(id: number): BatteryPosition | null {
+    return this.batteryPositions[id] ?? null;
   }
 
-  private findCityIndex(_regionId: number, _cityIndex: number): number {
-    return 0;
+  private findBatteryIndex(regionId: number, slotIndex: number): number {
+    return this.batterySlotIndex.findIndex(
+      (entry) => entry.regionId === regionId && entry.slotIndex === slotIndex
+    );
+  }
+
+  private findCityIndex(regionId: number, cityIndex: number): number {
+    return this.cityIndexMap.findIndex(
+      (entry) => entry.regionId === regionId && entry.cityIndex === cityIndex
+    );
   }
 
   private screenToWorld(e: MouseEvent): { worldX: number; worldY: number } {
@@ -217,6 +269,12 @@ export class InputManager {
   }
 
   private handleMouseMove(e: MouseEvent) {
+    if (this.currentPhase === "Strategic") {
+      const { mapX, mapY } = this.screenToCanvas(e);
+      this.onMapHover?.(mapX, mapY);
+      return;
+    }
+
     if (this.currentPhase !== "WaveActive") return;
 
     const { worldX, worldY } = this.screenToWorld(e);
@@ -284,9 +342,6 @@ export class InputManager {
           loadGame("quicksave");
         }
         break;
-      case "c":
-        this.onCRTToggle?.();
-        break;
       case "m":
         this.onMuteToggle?.();
         break;
@@ -310,7 +365,9 @@ export class InputManager {
   private async toggleFullscreen() {
     const win = getCurrentWindow();
     const isFullscreen = await win.isFullscreen();
-    await win.setFullscreen(!isFullscreen);
+    const nextFullscreen = !isFullscreen;
+    await win.setFullscreen(nextFullscreen);
+    this.onFullscreenChange?.(nextFullscreen);
   }
 
   private selectBattery(id: number) {
@@ -319,5 +376,12 @@ export class InputManager {
       this.onBatteryChange?.(this._selectedBattery);
       this.lastArcRequest = 0;
     }
+  }
+
+  private screenToCanvas(e: MouseEvent): { mapX: number; mapY: number } {
+    const rect = this.app.canvas.getBoundingClientRect();
+    const gameX = ((e.clientX - rect.left) / rect.width) * this.worldWidth;
+    const gameY = ((e.clientY - rect.top) / rect.height) * this.worldHeight;
+    return { mapX: gameX, mapY: gameY };
   }
 }

@@ -1,0 +1,152 @@
+.menuRoot {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px 24px;
+  gap: 24px;
+}
+
+.titleBlock {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.titleGlow {
+  font-size: 52px;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  opacity: 0.2;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 50px;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  letter-spacing: 10px;
+  text-transform: uppercase;
+  margin-top: -42px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--electric-blue);
+  letter-spacing: 3px;
+  margin-top: 12px;
+}
+
+.bootPanel {
+  pointer-events: none;
+  width: min(560px, 90%);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  padding: 12px 18px;
+  font-size: 12px;
+  color: var(--dim-text);
+  text-align: left;
+  min-height: 90px;
+}
+
+.bootLine {
+  line-height: 1.4;
+}
+
+.bootCursor {
+  font-size: 12px;
+  color: var(--neon-cyan);
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.panelArea {
+  pointer-events: none;
+  width: min(560px, 90%);
+  display: flex;
+  justify-content: center;
+}
+
+.mainPanel {
+  pointer-events: auto;
+  width: min(360px, 100%);
+  display: grid;
+  gap: 14px;
+}
+
+.panel {
+  pointer-events: auto;
+  width: min(560px, 100%);
+  background: rgba(5, 10, 18, 0.9);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panelHeader {
+  font-size: 16px;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.panelBody {
+  display: grid;
+  gap: 10px;
+}
+
+.panelFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.panelMuted {
+  color: var(--dim-text);
+  font-size: 13px;
+}
+
+.panelWarning {
+  color: var(--solar-yellow);
+  font-size: 13px;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  color: var(--dim-text);
+  letter-spacing: 2px;
+  margin-top: 6px;
+}
+
+.sectionRow {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.resolutionRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.footer {
+  font-size: 12px;
+  color: var(--dim-text);
+  margin-top: auto;
+  padding-top: 12px;
+}

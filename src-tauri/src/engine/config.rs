@@ -21,13 +21,16 @@ pub const OOB_MARGIN: f32 = 200.0;
 
 /// Standard interceptor defaults
 /// High thrust + short burn = rapid acceleration then coast/decelerate
-pub const INTERCEPTOR_THRUST: f32 = 500.0;
+pub const INTERCEPTOR_THRUST: f32 = 600.0;
 pub const INTERCEPTOR_BURN_TIME: f32 = 1.0;
 pub const INTERCEPTOR_CEILING: f32 = 700.0;
 
 /// Standard warhead defaults
 pub const WARHEAD_YIELD: f32 = 100.0;
 pub const WARHEAD_BLAST_RADIUS: f32 = 40.0;
+
+/// Interceptor blast radius multiplier (applies to all interceptor types)
+pub const INTERCEPTOR_BLAST_RADIUS_MULT: f32 = 1.25;
 
 /// Shockwave expansion rate (units/second)
 pub const SHOCKWAVE_EXPANSION_RATE: f32 = 200.0;
@@ -188,7 +191,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             drag_coeff: INTERCEPTOR_DRAG_COEFF,
             cross_section: INTERCEPTOR_CROSS_SECTION,
             yield_force: WARHEAD_YIELD,
-            blast_radius: WARHEAD_BLAST_RADIUS,
+            blast_radius: WARHEAD_BLAST_RADIUS * INTERCEPTOR_BLAST_RADIUS_MULT,
             proximity_fuse_radius: 0.0,
         },
         InterceptorType::Sprint => InterceptorProfile {
@@ -199,7 +202,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             drag_coeff: SPRINT_DRAG_COEFF,
             cross_section: SPRINT_CROSS_SECTION,
             yield_force: SPRINT_YIELD,
-            blast_radius: SPRINT_BLAST_RADIUS,
+            blast_radius: SPRINT_BLAST_RADIUS * INTERCEPTOR_BLAST_RADIUS_MULT,
             proximity_fuse_radius: 0.0,
         },
         InterceptorType::Exoatmospheric => InterceptorProfile {
@@ -210,7 +213,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             drag_coeff: EXO_DRAG_COEFF,
             cross_section: EXO_CROSS_SECTION,
             yield_force: EXO_YIELD,
-            blast_radius: EXO_BLAST_RADIUS,
+            blast_radius: EXO_BLAST_RADIUS * INTERCEPTOR_BLAST_RADIUS_MULT,
             proximity_fuse_radius: 0.0,
         },
         InterceptorType::AreaDenial => InterceptorProfile {
@@ -221,7 +224,7 @@ pub fn interceptor_profile(itype: InterceptorType) -> InterceptorProfile {
             drag_coeff: AREA_DENIAL_DRAG_COEFF,
             cross_section: AREA_DENIAL_CROSS_SECTION,
             yield_force: AREA_DENIAL_YIELD,
-            blast_radius: AREA_DENIAL_BLAST_RADIUS,
+            blast_radius: AREA_DENIAL_BLAST_RADIUS * INTERCEPTOR_BLAST_RADIUS_MULT,
             proximity_fuse_radius: 0.0,
         },
     }
