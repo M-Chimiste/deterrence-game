@@ -29,7 +29,7 @@ Deterrence reimagines the classic *Missile Command* formula as a physics-driven 
 - **Strategic campaign layer** — between tactical wave defense, allocate resources, expand territory, place batteries, upgrade radar, and make hard growth-vs-hardening tradeoffs.
 - **4 interceptor types** — Sprint (fast, short-range), Standard (balanced), THAAD (high-altitude), and Patriot (terminal defense), each with distinct flight envelopes.
 - **MIRV warheads & chain reactions** — enemy missiles split into multiple warheads mid-flight; skilled players exploit clustered salvos for chain kills.
-- **Weather & detection systems** — atmospheric conditions affect radar range, re-entry glow visibility, and drag. Clear skies reward vigilance; storms demand radar investment.
+- **Dynamic weather** — atmospheric conditions introduce wind forces that deflect missiles, alter wave intensity, and change the tactical landscape as campaigns progress.
 - **Cold War CRT aesthetic** — phosphor glow, scanlines, film grain, vector-line displays, and teletype readouts evoke NORAD command bunkers.
 
 ## Architecture
@@ -160,7 +160,7 @@ The project is in active development. Phases 1 through 8A of the [implementation
 - Campaign system (territory, economy, upgrades, wave composition)
 - Strategic phase UI with territory map
 - Save/load system with campaign persistence
-- Weather and radar/detection systems
+- Weather system (wind, wave intensity modifiers)
 - CRT shader pipeline (scanlines, phosphor glow, film grain)
 - Procedural audio system with synthesized sound effects
 - React UI with main menu, settings, HUD overlays
