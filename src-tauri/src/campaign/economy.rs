@@ -12,7 +12,7 @@ impl Default for CostTable {
     fn default() -> Self {
         Self {
             place_battery: 100,
-            restock_battery: 30,
+            restock_battery: 15,
             repair_cost_per_hp: 2,
         }
     }

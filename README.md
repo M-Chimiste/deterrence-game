@@ -1,12 +1,23 @@
-# Deterrence
+<p align="center">
+  <img src="deterrence-icon.jpeg" alt="Deterrence" width="200">
+</p>
 
-A physics-based missile defense strategy game with Cold War retro CRT aesthetics. Command a national defense network, manage radar coverage and interceptor batteries, and make hard triage decisions against escalating ballistic threats — where every missile follows real physics.
+<h1 align="center">Deterrence</h1>
 
-*The soul of the game: you are always losing slowly, and strategy determines how slowly.*
+<p align="center">
+A physics-based missile defense strategy game with Cold War retro CRT aesthetics.<br>
+Command a national defense network, manage radar coverage and interceptor batteries,<br>
+and make hard triage decisions against escalating ballistic threats — where every missile follows real physics.
+</p>
 
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Version](https://img.shields.io/badge/version-0.1.0-orange)
+<p align="center"><em>The soul of the game: you are always losing slowly, and strategy determines how slowly.</em></p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License">
+  <img src="https://img.shields.io/badge/version-0.1.0-orange" alt="Version">
+  <img src="https://img.shields.io/badge/tests-141%20passing-brightgreen" alt="Tests">
+</p>
 
 ## Overview
 

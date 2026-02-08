@@ -52,3 +52,8 @@ pub fn get_campaign_state(engine: tauri::State<'_, GameEngine>) {
 pub fn new_game(engine: tauri::State<'_, GameEngine>) {
     engine.send_command(EngineCommand::NewGame);
 }
+
+#[tauri::command]
+pub fn return_to_main_menu(engine: tauri::State<'_, GameEngine>) {
+    engine.send_command(EngineCommand::ReturnToMainMenu);
+}

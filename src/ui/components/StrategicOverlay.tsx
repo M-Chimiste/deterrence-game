@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { AvailableAction, RegionSnapshot } from "../../types/campaign";
 import { useGameStore } from "../store";
 import { handleStrategicAction, playUiClick } from "../gameActions";
+import { returnToMainMenu } from "../../bridge/commands";
 import { NeonButton } from "./controls/NeonButton";
 import styles from "../styles/StrategicOverlay.module.css";
 
@@ -120,8 +121,17 @@ export function StrategicOverlay() {
         <div className={styles.intel}>
           INTEL: {ownedRegions.length} regions secured | {totalCities} cities |{" "}
           {totalBatteries} batteries deployed | {emptySlots} open slots | ENTER=Start Wave
-          | F5=Quick Save | F9=Quick Load
+          | F5=Quick Save | F9=Quick Load | ESC=Main Menu
         </div>
+        <NeonButton
+          label="MAIN MENU"
+          size="sm"
+          variant="danger"
+          onClick={() => {
+            playUiClick();
+            returnToMainMenu();
+          }}
+        />
 
         {hoveredRegion && (
           <div className={styles.regionPanel}>

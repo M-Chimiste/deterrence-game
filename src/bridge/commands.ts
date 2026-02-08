@@ -82,6 +82,10 @@ export async function newGame(): Promise<void> {
   await invoke("new_game");
 }
 
+export async function returnToMainMenu(): Promise<void> {
+  await invoke("return_to_main_menu");
+}
+
 export async function saveGame(slotName: string): Promise<void> {
   await invoke("save_game", { slotName });
 }

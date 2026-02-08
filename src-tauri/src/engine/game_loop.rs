@@ -33,6 +33,7 @@ pub enum EngineCommand {
     SaveGame { slot_name: String, app_data_dir: PathBuf },
     LoadGame { save_data: SaveData },
     NewGame,
+    ReturnToMainMenu,
 }
 
 impl GameEngine {
@@ -196,6 +197,14 @@ fn run_loop(rx: mpsc::Receiver<EngineCommand>, app: AppHandle) {
                     let _ = app.emit("game:state_snapshot", &snapshot);
                     let campaign = sim.build_campaign_snapshot();
                     let _ = app.emit("campaign:state_update", &campaign);
+                }
+                EngineCommand::ReturnToMainMenu => {
+                    sim = Simulation::new();
+                    sim.setup_world();
+                    sim.phase = GamePhase::MainMenu;
+
+                    let snapshot = sim.build_snapshot();
+                    let _ = app.emit("game:state_snapshot", &snapshot);
                 }
                 EngineCommand::Player(player_cmd) => {
                     sim.push_command(player_cmd);

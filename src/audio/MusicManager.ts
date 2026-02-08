@@ -1,7 +1,7 @@
 import { TRACKS, getTrackForPhase } from "./trackConfig";
 import type { TrackDef } from "./trackConfig";
 
-const CROSSFADE_DURATION = 1.5; // seconds
+const CROSSFADE_DURATION = 4.0; // seconds
 
 /**
  * Handles music playback with seamless intro→loop transitions

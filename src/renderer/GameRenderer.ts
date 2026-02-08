@@ -129,6 +129,9 @@ export class GameRenderer {
       this.inputManager.setPhase(snapshot.phase);
       this.inputManager.setWindX(snapshot.wind_x ?? 0);
 
+      // Feed live battery ammo to input manager for auto-switch
+      this.updateInputBatteryAmmo(snapshot);
+
       // Update HUD store data
       this.updateHudFromSnapshot(snapshot);
       this.updateBatteryHudFromSnapshot();
@@ -411,6 +414,19 @@ export class GameRenderer {
     }
 
     this.store.getState().setHud({ battery: null });
+  }
+
+  private updateInputBatteryAmmo(snapshot: StateSnapshot) {
+    const batteries = snapshot.entities.filter((e) => e.entity_type === "Battery");
+    // Sort by x to match the order in InputManager.batteryPositions
+    batteries.sort((a, b) => a.x - b.x);
+    const ammo = batteries.map((bat) => {
+      if (bat.extra && "Battery" in bat.extra) {
+        return (bat.extra as { Battery: { ammo: number } }).Battery.ammo;
+      }
+      return 0;
+    });
+    this.inputManager.updateBatteryAmmo(ammo);
   }
 
   private setMuted(muted: boolean, persist: boolean) {

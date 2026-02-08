@@ -25,6 +25,7 @@ pub fn run() {
             commands::campaign::upgrade_interceptor,
             commands::campaign::get_campaign_state,
             commands::campaign::new_game,
+            commands::campaign::return_to_main_menu,
             commands::persistence::save_game,
             commands::persistence::load_game,
             commands::persistence::list_saves,

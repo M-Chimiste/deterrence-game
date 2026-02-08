@@ -12,6 +12,7 @@ import {
   upgradeInterceptor,
   saveGame,
   loadGame,
+  returnToMainMenu,
 } from "../bridge/commands";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { ArcPrediction } from "../types/commands";
@@ -52,6 +53,8 @@ export class InputManager {
     { x: 160, y: GROUND_Y },
     { x: 1120, y: GROUND_Y },
   ];
+  /** Live ammo counts per battery, updated from snapshots during wave */
+  private batteryAmmo: number[] = [];
   private cityIndexMap: CityMapEntry[] = [];
 
   /** Callback invoked with arc prediction results (or null to clear). */
@@ -198,6 +201,11 @@ export class InputManager {
     return this.batteryPositions[id] ?? null;
   }
 
+  /** Update live ammo counts from snapshot data (called each frame during wave) */
+  updateBatteryAmmo(ammo: number[]) {
+    this.batteryAmmo = ammo;
+  }
+
   private findCityIndex(regionId: number, cityIndex: number): number {
     return this.cityIndexMap.findIndex(
       (entry) => entry.regionId === regionId && entry.cityIndex === cityIndex
@@ -215,15 +223,21 @@ export class InputManager {
     };
   }
 
-  /** Pick the nearest battery to a world-X position. */
+  /** Pick the nearest battery to a world-X position, preferring batteries with ammo. */
   private nearestBattery(worldX: number): number {
     let bestIdx = 0;
     let bestDist = Infinity;
+    let bestHasAmmo = false;
+
     for (let i = 0; i < this.batteryPositions.length; i++) {
       const d = Math.abs(worldX - this.batteryPositions[i].x);
-      if (d < bestDist) {
+      const hasAmmo = (this.batteryAmmo[i] ?? 1) > 0;
+
+      // Prefer battery with ammo; among same-ammo-status, pick closest
+      if ((hasAmmo && !bestHasAmmo) || (hasAmmo === bestHasAmmo && d < bestDist)) {
         bestDist = d;
         bestIdx = i;
+        bestHasAmmo = hasAmmo;
       }
     }
     return bestIdx;
@@ -305,6 +319,11 @@ export class InputManager {
           continueToStrategic();
         } else if (this.currentPhase === "Strategic") {
           startWave();
+        }
+        break;
+      case "Escape":
+        if (this.currentPhase === "Strategic") {
+          returnToMainMenu();
         }
         break;
       case "F5":

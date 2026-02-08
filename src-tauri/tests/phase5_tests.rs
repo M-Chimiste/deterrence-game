@@ -160,7 +160,7 @@ fn restock_all_batteries_succeeds() {
     let resources_before = sim.campaign.resources;
     let result = sim.restock_all_batteries();
     assert!(result.is_ok());
-    assert_eq!(sim.campaign.resources, resources_before - 60); // 30 per battery * 2
+    assert_eq!(sim.campaign.resources, resources_before - 30); // 15 per battery * 2
 
     let ammo0 = sim.world.battery_states[bat0.index as usize].unwrap().ammo;
     let ammo1 = sim.world.battery_states[bat1.index as usize].unwrap().ammo;

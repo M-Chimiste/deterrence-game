@@ -261,12 +261,12 @@ fn thrust_accelerates_interceptor() {
 #[test]
 fn interceptor_goes_ballistic_after_burn() {
     let mut sim = Simulation::new();
-    // Target very far away so detonation system doesn't trigger during test
+    // Target very far away so detonation/overshoot doesn't trigger during test
     let idx = spawn_interceptor(&mut sim.world, 400.0, config::GROUND_Y, 400.0, 50000.0);
 
-    // Burn time is 2 seconds = 120 ticks
-    // Run just past burn time (125 ticks), keeping entity in bounds
-    for _ in 0..125 {
+    // Burn time is 1 second = 60 ticks (INTERCEPTOR_BURN_TIME = 1.0)
+    // Run just past burn time (65 ticks) — entity still well within OOB bounds (~y=394)
+    for _ in 0..65 {
         sim.tick();
     }
 
