@@ -1,6 +1,3 @@
-$ErrorActionPreference = "Stop"
-Set-StrictMode -Version Latest
-
 [CmdletBinding()]
 param(
   # If set, skips `npm install` even if `node_modules` is missing.
@@ -8,6 +5,9 @@ param(
   # If set, skips `cargo clippy` and `cargo test`.
   [switch]$SkipRustChecks
 )
+
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
 
 function Invoke-External {
   param(
@@ -35,7 +35,7 @@ function Invoke-External {
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
-Write-Host "=== Deterrence — Production Build (Windows) ==="
+Write-Host "=== Deterrence - Production Build (Windows) ==="
 
 # 1. Install frontend deps if needed
 if (-not $SkipInstall) {
@@ -46,7 +46,7 @@ if (-not $SkipInstall) {
 
 # 2. Rust checks
 if (-not $SkipRustChecks) {
-  Invoke-External cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+  Invoke-External cargo clippy --manifest-path src-tauri/Cargo.toml '--' -D warnings
   Invoke-External cargo test --manifest-path src-tauri/Cargo.toml
 }
 
