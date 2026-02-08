@@ -44,14 +44,17 @@ if (-not $SkipInstall) {
   }
 }
 
-# 2. Rust checks
+# 2. Frontend build (tsc + vite) - must run before Rust checks because
+#    tauri::generate_context!() validates that frontendDist ("../dist") exists at compile time
+Invoke-External npm run build
+
+# 3. Rust checks (requires dist/ from step 2)
 if (-not $SkipRustChecks) {
-  Invoke-External cargo clippy --manifest-path src-tauri/Cargo.toml '--' -D warnings
+  Write-Host ">>> cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings"
+  cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+  if ($LASTEXITCODE -ne 0) { Write-Error "cargo clippy failed with code $LASTEXITCODE"; exit $LASTEXITCODE }
   Invoke-External cargo test --manifest-path src-tauri/Cargo.toml
 }
-
-# 3. Frontend build (tsc + vite)
-Invoke-External npm run build
 
 # 4. Tauri production build (compiles Rust release + bundles Windows installers)
 Invoke-External npx tauri build
