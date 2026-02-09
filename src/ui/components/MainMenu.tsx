@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { newGame } from "../../bridge/commands";
 import { playUiClick } from "../gameActions";
 import { NeonButton } from "./controls/NeonButton";
@@ -419,6 +420,16 @@ export function MainMenu() {
               onClick={() => {
                 playUiClick();
                 setPanel("settings");
+              }}
+            />
+            <NeonButton
+              label="EXIT GAME"
+              size="lg"
+              fullWidth
+              variant="danger"
+              onClick={() => {
+                playUiClick();
+                getCurrentWindow().close();
               }}
             />
           </div>
