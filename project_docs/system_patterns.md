@@ -1,221 +1,222 @@
-# Deterrence — System Patterns
+# DETERRENCE — System Patterns
 
-**Technology stack, architecture, design patterns, and key technical decisions.**
+## Architecture Overview
+
+DETERRENCE follows a **strict simulation-authority architecture**: the Rust backend owns all game state, the TypeScript frontend is a pure view layer, and Tauri provides the IPC bridge between them. This is not MVC — it's closer to a **command-query separation** where the frontend sends commands and receives state snapshots, never computing game logic.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Tauri 2.x Shell                       │
+│                                                         │
+│  ┌──────────────────┐     IPC Bridge     ┌───────────┐  │
+│  │   Rust Backend    │◄──── invoke() ────│ TypeScript │  │
+│  │   (Simulation     │──── event() ─────►│ Frontend   │  │
+│  │    Authority)     │                   │ (View)     │  │
+│  │                   │  PlayerCommand ►  │            │  │
+│  │  deterrence-core  │  ◄ GameState      │  Three.js  │  │
+│  │  deterrence-sim   │  ◄ AudioEvent     │  Canvas    │  │
+│  │  deterrence-ai    │  ◄ Alert          │  Preact    │  │
+│  │  deterrence-terrain│                  │  Howler    │  │
+│  │  deterrence-procgen│                  │            │  │
+│  │  deterrence-campaign│                 │            │  │
+│  └──────────────────┘                    └───────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Guiding Principle
+
+**Rust computes. TypeScript renders. Tauri connects.**
+
+No game logic in the frontend. No rendering in the backend. The IPC boundary is the only coupling point, defined by a strict typed contract.
 
 ---
 
 ## Technology Stack
 
-| Layer | Technology | Version Target | Purpose |
-|---|---|---|---|
-| Application Shell | Tauri | v2.x | Native window management, filesystem access, IPC bridge between Rust and webview |
-| Backend / Game Engine | Rust | 2024 edition | Physics simulation, game state management, campaign logic, save/load |
-| Frontend / Renderer | PixiJS | v8.x | WebGL 2 rendering, particle systems, CRT post-processing shaders |
-| Frontend Framework | TypeScript | 5.x | Type-safe frontend logic, UI state, input handling |
-| UI Layer | HTML/CSS | — | Strategic phase menus, HUD overlays, teletype readouts |
-| Build System | Cargo + Vite | — | Rust compilation via Cargo, frontend bundling via Vite (Tauri's default frontend tooling) |
-| Serialization | serde + serde_json | — | Game state serialization for save/load and IPC |
-| RNG | rand + rand_chacha | — | Deterministic seeded RNG for wave generation and reproducibility |
-| Physics Math | glam | — | Fast vector/matrix math for trajectory calculations (f32, no-std compatible) |
+### Backend (Simulation)
 
----
+| Technology | Version | Purpose |
+|---|---|---|
+| Rust | 2021 edition (stable) | Simulation engine, game logic, all authoritative state |
+| Tauri | 2.x | Application shell, IPC, file system, window management, updates |
+| serde + serde_json | latest | IPC serialization (JSON default, MessagePack fallback for perf) |
+| nalgebra or glam | latest | Linear algebra: 3D kinematics, intercept geometry, coordinate transforms |
+| hecs | latest | Entity-Component-System for entity management (tracks, missiles, batteries) |
+| rand + rand_distr | latest | RNG: detection probability, Pk rolls, procedural generation |
+| noise / simdnoise | latest | Perlin/simplex noise: atmospheric ducting, clutter generation |
+| rayon | latest | Parallel iteration: radar sweep calculations across many contacts |
+| redb | latest | Embedded DB: campaign persistence, save games |
+| tokio | latest | Async runtime for Tauri event system and file I/O |
 
-## High-Level Architecture
+### Frontend (Rendering + UI)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Tauri Shell (v2)                      │
-│                                                         │
-│  ┌───────────────────┐       ┌───────────────────────┐  │
-│  │   Rust Backend     │ IPC  │   Webview Frontend     │  │
-│  │                   │◄─────►│                       │  │
-│  │  ┌─────────────┐ │       │  ┌─────────────────┐  │  │
-│  │  │ Physics Sim  │ │       │  │ PixiJS Renderer  │  │  │
-│  │  │ (fixed tick) │ │       │  │ (vsync render)   │  │  │
-│  │  └─────────────┘ │       │  └─────────────────┘  │  │
-│  │  ┌─────────────┐ │       │  ┌─────────────────┐  │  │
-│  │  │ Game State   │ │       │  │ Input Manager    │  │  │
-│  │  │ (authority)  │ │       │  │ (mouse/keyboard) │  │  │
-│  │  └─────────────┘ │       │  └─────────────────┘  │  │
-│  │  ┌─────────────┐ │       │  ┌─────────────────┐  │  │
-│  │  │ Wave Engine  │ │       │  │ UI / HUD Layer   │  │  │
-│  │  │ (spawning)   │ │       │  │ (HTML/CSS + JS)  │  │  │
-│  │  └─────────────┘ │       │  └─────────────────┘  │  │
-│  │  ┌─────────────┐ │       │  ┌─────────────────┐  │  │
-│  │  │ Campaign Mgr │ │       │  │ Post-Processing  │  │  │
-│  │  │ (save/load)  │ │       │  │ (CRT shaders)    │  │  │
-│  │  └─────────────┘ │       │  └─────────────────┘  │  │
-│  └───────────────────┘       └───────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-```
+| Technology | Version | Purpose |
+|---|---|---|
+| TypeScript | 5.x | All frontend code |
+| Three.js | r160+ | 3D world view: ocean, terrain, missiles, effects, camera |
+| Preact or Solid.js | latest | Reactive UI for panel components (lightweight, no React overhead) |
+| Zustand | latest | State management: reactive store for GameState snapshots |
+| Howler.js | latest | Audio playback: alerts, ambient, spatial, voice callouts |
+| Vite | 5.x | Build tool: HMR, TypeScript compilation, asset bundling |
+| @tauri-apps/api | 2.x | IPC bridge: invoke commands, listen to events |
 
-### Core Architectural Pattern: Authoritative Server / Dumb Client
+### Development & Tooling
 
-The Rust backend operates as the single source of truth for all game state, functioning like a local game server. The frontend is a stateless renderer that receives snapshots and sends input commands. This pattern was chosen because:
-
-- Physics determinism requires a single authoritative simulation with no competing state
-- Save/load becomes trivial — serialize the Rust state, done
-- No desync bugs between "what the game thinks" and "what the player sees"
-- If multiplayer is ever added, the architecture already separates simulation from rendering
-- Frontend can be swapped or reskinned without touching game logic
+| Tool | Purpose |
+|---|---|
+| Cargo workspace | Multi-crate Rust project management |
+| Vite + @tauri-apps/cli | Frontend build + Tauri integration |
+| tweakpane | Runtime debug UI for tuning simulation parameters |
+| cargo-watch | Auto-rebuild on Rust file changes |
+| vitest | Frontend unit testing |
+| cargo test | Backend unit + integration testing |
 
 ---
 
 ## Design Patterns
 
-### 1. Entity-Component System (ECS) — Physics Simulation
+### 1. Entity-Component-System (Simulation)
 
-The Rust backend uses a lightweight ECS pattern for all simulated entities (enemy missiles, interceptors, detonations, shockwaves). This is not a full ECS framework like Bevy — it's a simple, purpose-built implementation using Rust structs and Vec storage.
+All game entities (tracks, missiles, ships, batteries, jammers, civilian aircraft) are managed through an ECS architecture using `hecs`.
 
-**Why ECS over OOP hierarchy:**
-- Missiles, interceptors, and shockwaves share physics components (position, velocity, drag coefficient) but differ in behavior components (guided vs. ballistic, detonation trigger, MIRV split logic)
-- ECS allows composing entity types from reusable components without deep inheritance trees
-- Cache-friendly iteration over component arrays matters when simulating 100+ entities per tick during saturation attacks
-- Easy to add new entity types (new interceptor variants, new warhead types) without refactoring existing code
+**Why ECS:**
+- Tracks and missiles share some components (Position, Velocity) but differ in others (RadarCrossSection vs. SeekHead). ECS handles this naturally.
+- Radar detection is a system that iterates over `(Position, RCS)` entities against `(Radar, Position)` entities — a classic ECS query.
+- Adding new entity types (e.g., a new threat archetype) requires only composing existing components, no inheritance hierarchies.
+- Parallel iteration via `rayon` is trivial with ECS — radar sweep over 500 entities parallelizes cleanly.
 
 **Core Components:**
 ```
-Transform       { position: Vec2, rotation: f32 }
-Velocity        { linear: Vec2, angular: f32 }
-Ballistic       { drag_coefficient: f32, mass: f32, cross_section: f32 }
-Warhead         { yield_force: f32, blast_radius_base: f32, warhead_type: WarheadType }
-MirvCarrier     { child_count: u8, split_altitude: f32, spread_angle: f32 }
-Interceptor     { thrust: f32, burn_time: f32, ceiling: f32, battery_id: u32 }
-Radar           { range: f32, resolution: f32, weather_resistance: f32 }
-Health          { current: f32, max: f32 }
-Lifetime        { remaining_ticks: u32 }
-ReentryGlow     { intensity: f32, altitude_threshold: f32 }
+Position { lat, lon, alt }          — All entities
+Velocity { speed, heading, climb }  — Moving entities
+RadarCrossSection { base_rcs }      — Detectable entities
+TrackInfo { track_number, quality, classification, iff_status }
+ThreatProfile { archetype, phase, behavior_state }
+MissileState { phase, target_id, fuel, seeker_status }
+RadarSystem { type, energy_budget, sector, mode }
+LauncherState { cells, ready_count, reload_timer }
+Illuminator { channel_id, status, assigned_target }
+NetworkNode { link_quality, connected_units }
 ```
 
-**Core Systems (executed in order each tick):**
-```
-1. InputSystem          — Process player commands from frontend (launch interceptor, etc.)
-2. WaveSpawnerSystem    — Spawn new enemy missiles per wave schedule
-3. ThrustSystem         — Apply thrust to active interceptors during burn phase
-4. GravitySystem        — Apply gravitational acceleration to all ballistic entities
-5. DragSystem           — Apply altitude-dependent atmospheric drag
-6. MovementSystem       — Integrate velocity into position
-7. MirvSplitSystem      — Check MIRV carriers against split altitude, spawn child warheads
-8. CollisionSystem      — Detect proximity between shockwaves and entities (destroy/deflect)
-9. DetonationSystem     — Trigger interceptor detonations, spawn shockwave entities
-10. ShockwaveSystem     — Expand shockwave radius, apply force falloff, expire
-11. DamageSystem        — Apply damage to cities/infrastructure from warhead impacts
-12. CleanupSystem       — Remove expired entities (detonated warheads, dissipated shockwaves)
-13. DetectionSystem     — Update radar contacts based on radar range, weather, re-entry glow
-14. StateSnapshotSystem — Package current state for frontend transmission
-```
+**Core Systems (run each tick in order):**
+1. `ThreatAISystem` — Advance threat state machines, pathfinding, swarm coordination
+2. `RadarDetectionSystem` — Calculate Pd for each contact vs. each radar, manage track table
+3. `IdentificationSystem` — IFF interrogation, kinematic profiling, correlation
+4. `FireControlSystem` — DTE state machine, solution calculation, Pk evaluation
+5. `EngagementSystem` — Illuminator scheduling, missile guidance, midcourse updates
+6. `MissileKinematicsSystem` — Advance all in-flight missiles (friendly and threat)
+7. `InterceptSystem` — Evaluate intercept events, Pk rolls, BDA
+8. `EnvironmentSystem` — Update atmospheric conditions, ducting, clutter
+9. `NetworkSystem` — CEC/IBCS state, composite track fusion, link quality
+10. `AlertSystem` — Evaluate alert conditions, generate AudioEvents
+11. `ScoringSystem` — Track mission metrics
 
-### 2. Event-Driven Communication — IPC Bridge
+### 2. Command Pattern (Player Input)
 
-Communication between Rust backend and TypeScript frontend uses Tauri's event system and invoke commands, following an event-driven pattern.
+Player actions are encoded as a `PlayerCommand` enum, serialized, and dispatched to Rust via Tauri `invoke()`. Commands are validated and queued for the next simulation tick. This ensures:
+- All input is processed at simulation time, not render time
+- Input is replayable (for after-action review)
+- Invalid commands are rejected at the boundary
 
-**Backend → Frontend (Events — push model):**
-Events are emitted by the backend whenever state changes that the frontend needs to render. The frontend subscribes to event channels and updates its render state accordingly.
-
-```
-Event: "game:state_snapshot"     — Full entity positions/states, emitted every physics tick
-Event: "game:detonation"         — Detonation occurred at position, yield, altitude (triggers VFX)
-Event: "game:impact"             — Warhead hit ground at position (triggers impact VFX + audio)
-Event: "game:chain_reaction"     — Chain reaction occurred (triggers chain VFX sequence)
-Event: "game:city_damaged"       — City took damage (triggers UI update + audio)
-Event: "game:city_destroyed"     — City lost (triggers major UI event)
-Event: "game:wave_start"         — New wave beginning (triggers wave counter, weather update)
-Event: "game:wave_complete"      — Wave ended (transition to strategic phase)
-Event: "game:detection"          — New radar contact or re-entry glow spotted
-Event: "campaign:state_update"   — Campaign state changed (territory, resources, upgrades)
-```
-
-**Frontend → Backend (Commands — pull model):**
-The frontend invokes Rust commands when the player takes an action. Commands are validated by the backend before execution.
-
-```
-Command: "launch_interceptor"    — { battery_id, target_x, target_y }
-Command: "select_battery"        — { battery_id }
-Command: "place_battery"         — { region_id, position_x, position_y }
-Command: "upgrade_interceptor"   — { interceptor_type, upgrade_path }
-Command: "upgrade_radar"         — { radar_id, upgrade_type }
-Command: "expand_territory"      — { target_region_id }
-Command: "repair_city"           — { city_id }
-Command: "build_shelter"         — { city_id }
-Command: "start_wave"            — { }
-Command: "save_game"             — { slot_id }
-Command: "load_game"             — { slot_id }
+```rust
+enum PlayerCommand {
+    HookTrack { track_id: u32 },
+    ClassifyTrack { track_id: u32, classification: Classification },
+    VetoEngagement { engagement_id: u32 },
+    ConfirmEngagement { engagement_id: u32 },
+    RedirectEngagement { engagement_id: u32, weapon_type: WeaponType },
+    SetRadarSector { sector_center: f32, sector_width: f32 },
+    SetRadarPriority { sector_id: u32, priority: Priority },
+    SetDoctrine { mode: DoctrineMode },
+    SetEmcon { mode: EmconMode },           // Ground only
+    InitiateDisplacement {},                 // Ground only
+    SetCourse { heading: f32, speed: f32 },  // Naval only
+    ToggleView { view: ViewMode },
+    SetTimeScale { scale: f32 },
+    // ...
+}
 ```
 
-**Why event-driven over request/response:**
-- The physics sim runs at a fixed tick rate independent of the frontend — it pushes state, it doesn't wait to be asked
-- Events naturally decouple the simulation from rendering; the frontend processes whatever events are available each render frame
-- VFX events (detonation, impact) need to arrive at the moment they happen, not when the frontend next polls
-- The command pattern for player input gives the backend authority to validate and reject invalid actions (e.g., launching from an empty battery)
+### 3. State Snapshot Broadcasting (Rust → Frontend)
 
-### 3. State Machine — Game Phase Management
+The simulation runs at a fixed tick rate (default 30Hz). After each tick, the engine serializes the visible game state into a `GameStateSnapshot` and broadcasts it to the frontend via Tauri events. The frontend interpolates between consecutive snapshots for smooth rendering.
 
-The game transitions through distinct phases, managed by a state machine in the Rust backend.
+**Why snapshots, not incremental updates:**
+- Simpler to reason about — every frame the frontend has complete state
+- No desync bugs from missed deltas
+- Replay is trivial — just replay the snapshot sequence
+- Serialization cost is manageable at 30Hz for the expected state size (~50-100KB per snapshot)
 
-```
-┌──────────┐    start     ┌──────────┐   all enemies   ┌──────────────┐
-│ STRATEGIC │───────────►│  WAVE    │──────────────►│ WAVE_RESULT  │
-│  PHASE    │◄───────────│  ACTIVE  │               │  (summary)   │
-└──────────┘  continue   └──────────┘               └──────┬───────┘
-     │                        │                            │
-     │                        │ all cities lost            │ acknowledge
-     │                        ▼                            ▼
-     │                   ┌──────────┐              ┌──────────────┐
-     │                   │ REGION   │              │  STRATEGIC   │
-     │                   │  LOST    │              │   PHASE      │
-     │                   └────┬─────┘              └──────────────┘
-     │                        │
-     │            homeland?   │   frontier?
-     │               ▼        │      ▼
-     │         ┌──────────┐   │ ┌───────────┐
-     │         │ CAMPAIGN  │   └►│ CONTRACTION│──► STRATEGIC PHASE
-     │         │  OVER     │     └───────────┘
-     │         └──────────┘
-     │
-     ▼
-┌──────────┐
-│  PAUSED   │ (spacebar during strategic phase only)
-└──────────┘
+**Snapshot structure (simplified):**
+```rust
+struct GameStateSnapshot {
+    tick: u64,
+    time: SimTime,
+    tracks: Vec<TrackView>,           // All visible tracks with display data
+    engagements: Vec<EngagementView>, // Active engagements with timers
+    own_ship: OwnShipView,            // Or own_battery for ground
+    systems: SystemsView,             // Radar, VLS/launchers, illuminators, network
+    alerts: Vec<Alert>,               // Pending alerts since last tick
+    environment: EnvironmentView,     // Current conditions
+    score: ScoreView,                 // Running mission score
+}
 ```
 
-**Phase responsibilities:**
+### 4. Observer Pattern (Audio Events)
 
-| Phase | Backend | Frontend |
-|---|---|---|
-| STRATEGIC | Validates placements/upgrades, manages economy | Renders campaign map, upgrade UI, intel briefing |
-| WAVE_ACTIVE | Runs physics sim at fixed tick, processes input commands | Renders tactical view, handles mouse/keyboard input |
-| WAVE_RESULT | Calculates damage totals, updates campaign state | Shows wave summary (missiles destroyed, cities hit, resources earned) |
-| REGION_LOST | Removes region from player territory, adjusts enemy patterns | Shows region loss event, map contraction |
-| CAMPAIGN_OVER | Calculates final statistics | Shows campaign end screen, offers new campaign |
-| PAUSED | Simulation frozen, state preserved | Dim overlay, pause menu |
+Audio events are emitted as a separate channel from game state. This allows the audio system to react to discrete events (missile launch, intercept, new contact) without polling the full game state.
 
-### 4. Observer Pattern — Detection System
-
-The radar and re-entry glow detection system uses an observer pattern where detection sources (radar installations, visual scanning) observe the simulation and produce contacts for the frontend to display.
-
-**Why this matters as a separate pattern:** The player does not see raw simulation state. They see *detected* simulation state, filtered through their radar network and weather conditions. An enemy missile exists in the physics simulation from the moment it spawns, but it only appears on the player's screen when a detection source picks it up. This separation is critical to the radar-as-a-resource mechanic.
-
-```
-DetectionManager
-  ├── RadarSource[] (one per radar installation)
-  │     └── Observes: all entities within range × weather_multiplier
-  │         Produces: RadarContact { entity_id, position, velocity, confidence }
-  │
-  └── VisualSource (single, global)
-        └── Observes: entities below re-entry glow altitude threshold
-            Filtered by: weather_visibility (clear = 1.0, overcast = 0.3, storm = 0.0)
-            Produces: GlowContact { position, intensity } (no velocity — player must infer)
+```rust
+enum AudioEvent {
+    NewContact { bearing: f32, priority: ThreatPriority },
+    ContactLost { track_id: u32 },
+    ThreatEvaluated { track_id: u32, threat_level: ThreatLevel },
+    VetoClockStart { engagement_id: u32, duration_secs: f32 },
+    BirdAway { weapon_type: WeaponType },
+    Splash { result: InterceptResult },
+    VampireVampire { bearing: f32, count: u32 },
+    ArmInbound {},          // Ground only
+    LauncherReloading {},   // Ground only
+    DisplacementStarted {}, // Ground only
+    NetworkDegraded { severity: f32 },
+}
 ```
 
-The frontend receives merged contacts from all detection sources. Radar contacts include velocity vectors (shown as trajectory predictions on the HUD). Glow contacts are position-only — the player sees a streak but must infer trajectory from watching it move across frames. This asymmetry between detection methods is a deliberate design choice that rewards skilled players who invest attention rather than just resources.
+### 5. Data-Driven Configuration
 
-### 5. Command Pattern — Player Actions
+All game content is defined in data files, not hardcoded. This enables rapid balancing, modding, and community content.
 
-All player actions during both tactical and strategic phases are encapsulated as command objects. This provides:
+**Data file types:**
+- `threats/*.yaml` — Threat archetype definitions (speed, RCS, behavior, phases)
+- `interceptors/*.yaml` — Interceptor definitions (range, Pk curves, guidance type)
+- `theaters/*.yaml` — Theater definitions (geography, environment profile, threat palette, civilian density)
+- `scenarios/*.yaml` — Curated scenario templates for procedural generation
+- `doctrines/*.yaml` — Engagement doctrine presets
+- `symbology/*.yaml` — NTDS and MIL-STD-2525 symbol definitions
+- `audio/*.yaml` — Audio event mappings and ambient layer definitions
 
-- **Validation:** The backend checks every command before execution (sufficient ammo? battery in range? enough resources for upgrade?)
-- **Replay potential:** If replay functionality is ever added, the command log perfectly reproduces a session when fed into the deterministic simulation
-- **Undo (strategic phase):** During the between-wave phase, placement and upgrade commands can be undone before confirming and starting the next wave
+Loaded by Rust at startup via `serde`, validated against schemas.
+
+### 6. State Machine (Engagement Lifecycle)
+
+Each engagement is modeled as an independent state machine that progresses through defined phases. State machines are explicit (enum-based), not implicit (boolean flags).
+
+```rust
+enum EngagementPhase {
+    SolutionCalc { quality: f32, timer: f32 },
+    Ready { veto_timer: f32, weapon: WeaponType, target: TrackId },
+    Launched { missile_id: EntityId },
+    Boost { capture_quality: f32 },
+    Midcourse { error_signal: Vec3, uplink_quality: f32 },
+    Terminal { guidance_mode: GuidanceMode, time_to_intercept: f32 },
+    Intercept { result: Option<InterceptResult> },
+    Complete { result: InterceptResult },
+    Aborted { reason: AbortReason },
+}
+```
+
+This pattern is used for all lifecycle entities: threats (cruise → terminal → impact), missiles (boost → midcourse → terminal), launchers (ready → firing → reloading), and the mission itself.
 
 ---
 
@@ -223,339 +224,276 @@ All player actions during both tactical and strategic phases are encapsulated as
 
 ```
 deterrence/
-├── src-tauri/                          # Rust backend (Tauri + game engine)
-│   ├── Cargo.toml
-│   ├── tauri.conf.json                 # Tauri configuration (window, permissions, bundler)
-│   ├── src/
-│   │   ├── main.rs                     # Tauri app entry point, plugin registration
-│   │   ├── lib.rs                      # Module declarations
-│   │   ├── commands/                   # Tauri invoke command handlers
-│   │   │   ├── mod.rs
-│   │   │   ├── tactical.rs             # launch_interceptor, select_battery
-│   │   │   ├── strategic.rs            # place_battery, upgrade_radar, expand_territory
-│   │   │   └── campaign.rs             # save_game, load_game, start_wave
-│   │   ├── engine/                     # Core game engine
-│   │   │   ├── mod.rs
-│   │   │   ├── game_loop.rs            # Fixed-timestep loop, phase state machine
-│   │   │   ├── simulation.rs           # Top-level simulation orchestrator (runs systems in order)
-│   │   │   └── config.rs               # Simulation constants (gravity, tick rate, drag tables)
-│   │   ├── ecs/                        # Entity-Component System
-│   │   │   ├── mod.rs
-│   │   │   ├── world.rs                # Entity storage, component arrays, entity creation/destruction
-│   │   │   ├── components.rs           # All component struct definitions
-│   │   │   └── entity.rs               # Entity ID type, generation tracking
-│   │   ├── systems/                    # ECS systems (one file per system)
-│   │   │   ├── mod.rs
-│   │   │   ├── gravity.rs
-│   │   │   ├── drag.rs
-│   │   │   ├── thrust.rs
-│   │   │   ├── movement.rs
-│   │   │   ├── collision.rs
-│   │   │   ├── detonation.rs
-│   │   │   ├── shockwave.rs
-│   │   │   ├── mirv_split.rs
-│   │   │   ├── damage.rs
-│   │   │   ├── detection.rs
-│   │   │   ├── wave_spawner.rs
-│   │   │   ├── cleanup.rs
-│   │   │   └── state_snapshot.rs
-│   │   ├── campaign/                   # Strategic campaign layer
-│   │   │   ├── mod.rs
-│   │   │   ├── territory.rs            # Region definitions, expansion logic, terrain effects
-│   │   │   ├── economy.rs              # Resource generation, spending, cost tables
-│   │   │   ├── upgrades.rs             # Tech tree, interceptor types, radar upgrades
-│   │   │   ├── wave_composer.rs        # Wave difficulty scaling, enemy composition per wave
-│   │   │   └── weather.rs              # Weather generation, radar/visibility effects
-│   │   ├── state/                      # Game state types
-│   │   │   ├── mod.rs
-│   │   │   ├── game_state.rs           # Top-level game state (current phase, tick count, etc.)
-│   │   │   ├── campaign_state.rs       # Territory, resources, upgrades, population
-│   │   │   ├── wave_state.rs           # Current wave number, active entities, score
-│   │   │   └── snapshot.rs             # Serializable state snapshot for frontend transmission
-│   │   ├── events/                     # Backend event definitions
-│   │   │   ├── mod.rs
-│   │   │   └── game_events.rs          # All event types (detonation, impact, detection, etc.)
-│   │   └── persistence/                # Save/load
-│   │       ├── mod.rs
-│   │       └── save_manager.rs         # Serialize/deserialize campaign state, save slots
-│   └── tests/                          # Rust integration tests
-│       ├── physics_tests.rs            # Trajectory accuracy, blast propagation validation
-│       ├── determinism_tests.rs        # Same seed → same outcome verification
-│       └── campaign_tests.rs           # Economy balance, wave composition tests
+├── Cargo.toml                      # Workspace root
+├── Cargo.lock
+├── tauri.conf.json                  # Tauri configuration
+├── .cargo/
+│   └── config.toml                  # Cargo workspace settings
 │
-├── src/                                # TypeScript frontend (PixiJS + UI)
-│   ├── main.ts                         # Frontend entry point, Tauri event listeners, app bootstrap
-│   ├── renderer/                       # PixiJS rendering layer
-│   │   ├── GameRenderer.ts             # Top-level PixiJS Application, stage management
-│   │   ├── TacticalView.ts             # Wave gameplay rendering (missiles, arcs, detonations)
-│   │   ├── StrategicView.ts            # Campaign map rendering (regions, batteries, radar coverage)
-│   │   ├── HUD.ts                      # Heads-up display (ammo counts, radar status, wave info)
-│   │   ├── Interpolator.ts             # Smooths between physics snapshots for render frames
-│   │   ├── entities/                   # Renderable entity classes
-│   │   │   ├── MissileRenderer.ts      # Trail drawing, re-entry glow effect
-│   │   │   ├── InterceptorRenderer.ts  # Predicted arc overlay, active flight trail
-│   │   │   ├── DetonationRenderer.ts   # Expanding shockwave ring, bloom trigger
-│   │   │   ├── CityRenderer.ts         # City skyline, damage states, population indicator
-│   │   │   ├── BatteryRenderer.ts      # Battery position marker, ammo gauge
-│   │   │   └── RadarRenderer.ts        # Radar sweep effect, detection range circle
-│   │   ├── effects/                    # Visual effects
-│   │   │   ├── ParticleManager.ts      # PixiJS particle emitter pool for explosions, weather
-│   │   │   ├── WeatherOverlay.ts       # Cloud layers, rain static, wind streaks
-│   │   │   └── ImpactEffect.ts         # Ground impact flash, city damage transition
-│   │   └── shaders/                    # Custom WebGL shaders
-│   │       ├── crt.frag                # CRT curvature distortion, scanlines, vignetting
-│   │       ├── phosphor.frag           # Phosphor glow / bloom pass
-│   │       └── filmgrain.frag          # Film grain noise overlay
-│   ├── input/                          # Player input handling
-│   │   ├── InputManager.ts             # Mouse + keyboard event capture, keybinding config
-│   │   ├── TacticalInput.ts            # Click-to-target, drag-to-adjust, battery selection
-│   │   └── StrategicInput.ts           # Map interaction, placement mode, upgrade menus
-│   ├── ui/                             # HTML/CSS UI panels (strategic phase)
-│   │   ├── UpgradePanel.ts             # Tech tree / upgrade selection interface
-│   │   ├── TerritoryPanel.ts           # Expansion options, region info
-│   │   ├── IntelBriefing.ts            # Pre-wave intel readout (weather, threat assessment)
-│   │   ├── WaveSummary.ts              # Post-wave results screen
-│   │   └── MainMenu.ts                 # Title screen, save slot selection, settings
-│   ├── state/                          # Frontend state management
-│   │   ├── RenderState.ts              # Current entity positions, interpolated for rendering
-│   │   ├── UIState.ts                  # Menu state, selected battery, zoom level
-│   │   └── AudioState.ts               # Current audio context, active sounds
-│   ├── audio/                          # Audio management
-│   │   ├── AudioManager.ts             # Web Audio API wrapper, spatial audio
-│   │   ├── SoundBank.ts                # Sound effect registry and loading
-│   │   └── MusicController.ts          # Soundtrack playback, dynamic intensity
-│   ├── bridge/                         # Tauri IPC bridge
-│   │   ├── commands.ts                 # Typed wrappers around Tauri invoke() calls
-│   │   └── events.ts                   # Typed Tauri event listeners and handlers
-│   └── types/                          # Shared TypeScript type definitions
-│       ├── snapshot.ts                 # Game state snapshot types (mirrors Rust snapshot.rs)
-│       ├── commands.ts                 # Command payload types (mirrors Rust command handlers)
-│       └── events.ts                   # Event payload types (mirrors Rust game_events.rs)
+├── crates/
+│   ├── deterrence-core/             # Core types, no dependencies on Tauri
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── types.rs             # Position, Velocity, Classification, etc.
+│   │       ├── components.rs        # ECS components
+│   │       ├── commands.rs          # PlayerCommand enum
+│   │       ├── state.rs             # GameStateSnapshot, views
+│   │       ├── events.rs            # AudioEvent, Alert
+│   │       └── constants.rs         # Physical constants, defaults
+│   │
+│   ├── deterrence-sim/              # Simulation engine
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── engine.rs            # Main simulation loop, tick management
+│   │       ├── radar/
+│   │       │   ├── mod.rs
+│   │       │   ├── detection.rs     # Detection probability model
+│   │       │   ├── tracking.rs      # Track management lifecycle
+│   │       │   ├── energy.rs        # Radar energy budget
+│   │       │   └── environment.rs   # Ducting, clutter, weather effects
+│   │       ├── fire_control/
+│   │       │   ├── mod.rs
+│   │       │   ├── dte.rs           # Detect-to-Engage state machine
+│   │       │   ├── solution.rs      # PIP calculation, solution quality
+│   │       │   ├── illuminator.rs   # Channel scheduling
+│   │       │   └── pk.rs            # Probability of kill model
+│   │       ├── kinematics/
+│   │       │   ├── mod.rs
+│   │       │   ├── missile.rs       # Interceptor flight models
+│   │       │   ├── threat.rs        # Threat flight profiles
+│   │       │   └── geometry.rs      # Intercept geometry, engagement envelopes
+│   │       ├── identification/
+│   │       │   ├── mod.rs
+│   │       │   ├── iff.rs           # IFF interrogation model
+│   │       │   └── profiling.rs     # Kinematic profiling, correlation
+│   │       └── network/
+│   │           ├── mod.rs
+│   │           ├── cec.rs           # Cooperative Engagement Capability
+│   │           ├── ibcs.rs          # Integrated Battle Command System
+│   │           └── fusion.rs        # Composite track fusion
+│   │
+│   ├── deterrence-threat-ai/        # Threat behavior
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state_machine.rs     # Per-threat behavior FSM
+│   │       ├── pathfinding.rs       # Terrain-following, waypoint routing
+│   │       ├── swarm.rs             # Coordinated attack logic
+│   │       ├── sead.rs              # SEAD/ARM targeting logic
+│   │       ├── decoy.rs             # Decoy and jammer behavior
+│   │       └── coordinator.rs       # Wave sequencing, time-on-top, multi-axis
+│   │
+│   ├── deterrence-terrain/          # Terrain system
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── heightmap.rs         # Heightmap loading and querying
+│   │       ├── los.rs               # Line-of-sight calculation
+│   │       ├── masking.rs           # Radar terrain masking (precomputed tables)
+│   │       └── coverage.rs          # Coverage fan visualization data
+│   │
+│   ├── deterrence-procgen/          # Mission generation
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── generator.rs         # Mission generator core
+│   │       ├── theater.rs           # Theater parameter loading
+│   │       ├── difficulty.rs        # Difficulty scaling curves
+│   │       ├── validation.rs        # Solvability verification
+│   │       └── civilian.rs          # Civilian traffic generation
+│   │
+│   ├── deterrence-campaign/         # Campaign & progression
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── campaign.rs          # Campaign state machine
+│   │       ├── progression.rs       # Career tier unlocks
+│   │       ├── scoring.rs           # Scoring calculations
+│   │       ├── persistence.rs       # Save/load via redb
+│   │       └── branching.rs         # Mission branching logic
+│   │
+│   └── deterrence-app/              # Tauri application entry
+│       ├── Cargo.toml
+│       └── src/
+│           ├── main.rs              # Tauri entry point
+│           ├── ipc.rs               # Command handlers, event emitters
+│           ├── state.rs             # App state management
+│           └── config.rs            # Settings, user preferences
 │
-├── assets/                             # Game assets
-│   ├── audio/
-│   │   ├── sfx/                        # Sound effects (launch, detonation, impact, siren)
-│   │   └── music/                      # Soundtrack tracks
-│   ├── fonts/                          # Military-stencil typeface, teletype font
-│   └── data/
-│       ├── terrain_maps/               # Region terrain definitions (JSON or binary)
-│       ├── wave_tables/                # Wave composition data (enemy counts, types, timings)
-│       └── upgrade_trees/              # Interceptor and radar upgrade definitions
+├── frontend/                        # TypeScript / Three.js frontend
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── vite.config.ts
+│   ├── index.html
+│   └── src/
+│       ├── main.ts                  # Application entry
+│       ├── ipc/
+│       │   ├── bridge.ts            # Tauri invoke/event wrappers
+│       │   ├── commands.ts          # PlayerCommand type definitions (mirrors Rust)
+│       │   └── state.ts             # GameStateSnapshot type definitions (mirrors Rust)
+│       ├── store/
+│       │   ├── gameState.ts         # Zustand store for GameState
+│       │   └── interpolation.ts     # Snapshot interpolation for smooth rendering
+│       ├── tactical/                # 2D tactical displays
+│       │   ├── PPI.ts               # Plan Position Indicator (main radar display)
+│       │   ├── symbology.ts         # NTDS / MIL-STD-2525 symbol rendering
+│       │   ├── tracks.ts            # Track rendering: velocity leaders, history dots
+│       │   ├── overlays.ts          # Range rings, bearing lines, coverage fans
+│       │   ├── ascope.ts            # A-Scope display
+│       │   └── shaders/
+│       │       ├── phosphor.glsl    # Phosphor glow / CRT effect
+│       │       └── bloom.glsl       # Symbol bloom
+│       ├── panels/                  # UI panels (Preact/Solid components)
+│       │   ├── VLSStatus.tsx        # VLS / launcher status panel
+│       │   ├── IlluminatorStatus.tsx # Illuminator / guidance channel panel
+│       │   ├── ThreatTable.tsx      # Threat evaluation / engagement schedule
+│       │   ├── VetoClock.tsx        # Veto Clock display with countdown timers
+│       │   ├── EnvironmentPanel.tsx # SEAWASP / radar coverage
+│       │   ├── NetworkPanel.tsx     # CEC / IBCS status
+│       │   ├── EmconPanel.tsx       # EMCON controls (ground)
+│       │   ├── ReloadQueue.tsx      # Launcher reload management (ground)
+│       │   ├── PEPButtons.tsx       # Programmable Entry Panel buttons
+│       │   └── TrackBlock.tsx       # Hooked track data readout
+│       ├── world/                   # 3D world view (Three.js)
+│       │   ├── Scene.ts             # Scene setup, render loop
+│       │   ├── Ocean.ts             # Ocean shader and mesh
+│       │   ├── Terrain.ts           # Heightmap-based terrain
+│       │   ├── Sky.ts               # Skybox, time-of-day lighting
+│       │   ├── MissileTrails.ts     # Particle system for missile/threat trails
+│       │   ├── Intercepts.ts        # Intercept visual effects
+│       │   ├── Ships.ts             # Ship models
+│       │   ├── Batteries.ts         # Ground battery models
+│       │   ├── Camera.ts            # Camera controller (free, follow, cinematic)
+│       │   └── shaders/
+│       │       ├── ocean.glsl       # Water surface shader
+│       │       └── trail.glsl       # Missile trail shader
+│       ├── audio/
+│       │   ├── AudioManager.ts      # Sound management, event routing
+│       │   ├── ambient.ts           # CIC ambient layers
+│       │   ├── alerts.ts            # Alert tone definitions
+│       │   ├── tension.ts           # Tension escalation system
+│       │   └── voice.ts             # Voice callout playback
+│       ├── hud/
+│       │   ├── WindowManager.ts     # Draggable/resizable panel layout
+│       │   ├── layouts.ts           # Preset layout configurations
+│       │   └── Theme.ts             # CIC dark theme, fonts, colors
+│       └── input/
+│           ├── InputManager.ts      # Keyboard/mouse event routing
+│           ├── hotkeys.ts           # Hotkey definitions and remapping
+│           └── trackball.ts         # Trackball cursor simulation (optional)
 │
-├── docs/                               # Project documentation
-│   ├── deterrence-prd.md
+├── data/                            # Game content (data-driven)
+│   ├── threats/
+│   │   ├── sea_skimmer_mk1.yaml
+│   │   ├── supersonic_cruiser.yaml
+│   │   ├── hypersonic_glider.yaml
+│   │   ├── tactical_ballistic.yaml
+│   │   ├── subsonic_drone.yaml
+│   │   └── ...
+│   ├── interceptors/
+│   │   ├── standard_naval.yaml
+│   │   ├── extended_range.yaml
+│   │   ├── mse.yaml
+│   │   ├── high_altitude.yaml
+│   │   └── ...
+│   ├── theaters/
+│   │   ├── strait_of_hormuz.yaml
+│   │   ├── south_china_sea.yaml
+│   │   ├── korean_peninsula.yaml
+│   │   ├── central_europe.yaml
+│   │   └── ...
+│   ├── scenarios/                   # Curated scenario templates
+│   ├── doctrines/                   # Engagement doctrine presets
+│   ├── symbology/                   # Symbol definitions
+│   └── audio/                       # Audio event mappings
+│
+├── assets/                          # Binary assets
+│   ├── terrain/                     # Heightmap data per theater
+│   ├── models/                      # 3D models (ships, batteries, missiles)
+│   ├── textures/                    # Terrain textures, skyboxes
+│   ├── sounds/                      # Audio files
+│   └── fonts/                       # Monospace fonts (JetBrains Mono, IBM Plex Mono)
+│
+├── docs/                            # Project documentation
+│   ├── project_brief.md
 │   ├── product_context.md
-│   └── system_patterns.md
+│   ├── system_patterns.md
+│   ├── tech_context.md
+│   └── reference/                   # AEGIS technical reference, radar physics notes
 │
-├── package.json                        # Frontend dependencies (PixiJS, TypeScript, Vite)
-├── tsconfig.json                       # TypeScript configuration
-├── vite.config.ts                      # Vite bundler configuration (Tauri plugin)
-└── README.md
+└── tests/
+    ├── sim/                         # Rust integration tests
+    │   ├── radar_detection.rs
+    │   ├── fire_control.rs
+    │   ├── engagement_flow.rs
+    │   └── mission_generation.rs
+    └── frontend/                    # Frontend tests
+        ├── ipc.test.ts
+        └── symbology.test.ts
 ```
-
----
-
-## Component Relationships
-
-### Data Flow During Wave (Tactical Phase)
-
-```
-Player clicks sky
-       │
-       ▼
-InputManager.ts ──► commands.ts ──► [Tauri IPC] ──► commands/tactical.rs
-                                                          │
-                                                          ▼
-                                                    Validates:
-                                                    - Battery has ammo?
-                                                    - Target in range?
-                                                    - Battery not reloading?
-                                                          │
-                                                          ▼
-                                                    Creates Interceptor entity
-                                                    (Transform + Velocity + Ballistic
-                                                     + Interceptor + Warhead components)
-                                                          │
-                                                          ▼
-                                               ┌─── Simulation Tick ───┐
-                                               │                       │
-                                               │  ThrustSystem         │
-                                               │  GravitySystem        │
-                                               │  DragSystem           │
-                                               │  MovementSystem       │
-                                               │  MirvSplitSystem      │
-                                               │  CollisionSystem      │
-                                               │  DetonationSystem ────┼──► Emits "game:detonation" event
-                                               │  ShockwaveSystem      │
-                                               │  DamageSystem ────────┼──► Emits "game:impact" / "game:city_damaged"
-                                               │  DetectionSystem      │
-                                               │  CleanupSystem        │
-                                               │  StateSnapshotSystem ─┼──► Emits "game:state_snapshot"
-                                               │                       │
-                                               └───────────────────────┘
-                                                          │
-                                                   [Tauri Events]
-                                                          │
-                                                          ▼
-events.ts ──► Interpolator.ts ──► TacticalView.ts ──► PixiJS Stage ──► Screen
-                                        │
-                                        ├──► DetonationRenderer (on detonation event)
-                                        ├──► ParticleManager (explosions, shockwaves)
-                                        └──► HUD update (ammo, radar contacts)
-```
-
-### Data Flow During Strategic Phase
-
-```
-Player clicks "Expand to Region 4"
-       │
-       ▼
-StrategicInput.ts ──► commands.ts ──► [Tauri IPC] ──► commands/strategic.rs
-                                                             │
-                                                             ▼
-                                                       Validates:
-                                                       - Region adjacent?
-                                                       - Sufficient resources?
-                                                       - Region not already owned?
-                                                             │
-                                                             ▼
-                                                       campaign/territory.rs
-                                                       - Adds region to player territory
-                                                       - Reveals new battery positions
-                                                       - Registers new cities + population
-                                                             │
-                                                             ▼
-                                                       campaign/economy.rs
-                                                       - Deducts expansion cost
-                                                       - Recalculates resource generation
-                                                             │
-                                                             ▼
-                                                       campaign/wave_composer.rs
-                                                       - Adjusts future wave patterns
-                                                         for new territory shape
-                                                             │
-                                                             ▼
-                                                       Emits "campaign:state_update"
-                                                             │
-                                                      [Tauri Event]
-                                                             │
-                                                             ▼
-                                    events.ts ──► StrategicView.ts ──► Map re-render
-                                                        │
-                                                        ├──► TerritoryPanel update
-                                                        └──► IntelBriefing update
-```
-
-### Component Ownership Summary
-
-| Component | Owns | Communicates With |
-|---|---|---|
-| `game_loop.rs` | Phase state machine, tick scheduling | All systems, command handlers, event emitters |
-| `simulation.rs` | System execution order | All ECS systems |
-| `world.rs` | Entity storage, component arrays | All ECS systems (read/write) |
-| `campaign/territory.rs` | Region map, terrain data | economy.rs, wave_composer.rs, weather.rs |
-| `campaign/economy.rs` | Resource pool, cost tables | territory.rs, upgrades.rs |
-| `campaign/wave_composer.rs` | Enemy wave definitions | territory.rs (for attack vectors), weather.rs |
-| `GameRenderer.ts` | PixiJS Application, render loop | TacticalView, StrategicView, HUD |
-| `Interpolator.ts` | Snapshot buffer, lerp state | GameRenderer (provides interpolated positions) |
-| `InputManager.ts` | Raw input events, keybinds | TacticalInput, StrategicInput |
-| `bridge/commands.ts` | IPC command dispatch | Rust command handlers (via Tauri invoke) |
-| `bridge/events.ts` | IPC event subscriptions | Rust event emitters (via Tauri listen) |
 
 ---
 
 ## Key Architectural Decisions
 
-### 1. Physics in Rust, Rendering in JS
+### Decision 1: Rust Owns All Game State
 
-**Decision:** The physics simulation runs entirely in the Rust backend. The PixiJS frontend never calculates physics — it only renders state it receives.
+**Context:** The simulation involves complex interacting systems (radar, fire control, AI, environment) that must produce deterministic, consistent results.
 
-**Rationale:**
-- Determinism is a hard requirement (seeded waves must produce identical outcomes). JavaScript's floating-point behavior, garbage collection pauses, and event loop timing make deterministic simulation unreliable. Rust's predictable execution model and lack of GC eliminates this class of bugs entirely.
-- Performance headroom for saturation attacks. Late-game waves can have 100+ simultaneous entities with pairwise shockwave interaction checks. Rust handles this without breaking a sweat; JS would require careful optimization and might still stutter.
-- Clean separation of concerns. Game logic bugs can be tested and debugged in Rust without a browser. Rendering bugs can be debugged in the browser without touching game logic.
+**Decision:** All game logic lives in Rust. The TypeScript frontend receives serialized state snapshots and renders them. The frontend never computes game logic, even for seemingly simple things like "is this track in range."
 
-**Tradeoff:** IPC overhead. Every physics tick requires serializing state and sending it across the Tauri bridge. Mitigation: snapshots are compact (entity positions + velocities, not full component data), and Tauri's IPC is fast enough for 60 Hz state transfer of this payload size.
+**Rationale:** Determinism for replay. Single source of truth prevents desync. Performance for radar calculations. Enables headless testing of the entire simulation.
 
-### 2. Fixed Timestep Simulation with Render Interpolation
+**Tradeoff:** Higher IPC overhead. Frontend cannot respond to hover/selection interactions without a round-trip to Rust for game-state-dependent calculations. Mitigated by including precomputed display data in snapshots (e.g., track blocks include pre-formatted strings, engagement status includes display-ready timers).
 
-**Decision:** The physics simulation runs at a fixed tick rate (60 Hz target) independent of the display refresh rate. The frontend interpolates between the two most recent snapshots for smooth rendering.
+### Decision 2: ECS Over Object-Oriented Entities
 
-**Rationale:**
-- Fixed timestep ensures identical simulation results regardless of the player's hardware. A player running at 144 Hz sees smoother animation but the missiles follow the exact same paths as a player at 30 Hz.
-- Interpolation prevents visual stutter when the render rate and physics rate don't align. The frontend holds two snapshots and lerps entity positions based on how far between ticks the current render frame falls.
-- Decouples simulation correctness from rendering performance. If the renderer hitches (shader compilation, particle burst), the simulation continues unaffected.
+**Context:** The game has many entity types (tracks, missiles, ships, batteries, jammers) with overlapping but not identical component sets.
 
-**Tradeoff:** Adds one tick of visual latency (entities are always rendered slightly behind their "true" position). At 60 Hz physics this is ~16ms — imperceptible for a game where intercepts are planned, not twitch-reacted.
+**Decision:** Use `hecs` ECS rather than inheritance-based entity hierarchies.
 
-### 3. Lightweight Custom ECS over Framework (Bevy, etc.)
+**Rationale:** Component composition is natural for this domain. A "tracked contact" might be a threat missile, a civilian aircraft, a friendly ship, or a decoy — same Position and RCS components, different behavior components. Radar detection doesn't care what kind of entity it's detecting, only that it has Position and RCS. ECS queries model this perfectly.
 
-**Decision:** Build a simple, purpose-specific ECS in Rust rather than using an existing game framework.
+**Tradeoff:** ECS has a learning curve. State machine logic for engagement phases may feel awkward in pure ECS. Hybrid approach: ECS for entity data, explicit state machines for lifecycle logic that references ECS entities.
 
-**Rationale:**
-- Deterrence is a 2D physics simulation with ~15 component types and ~14 systems. Bevy, Amethyst, or similar frameworks bring massive dependency trees, steep learning curves, and architectural opinions that would fight the Tauri shell integration.
-- The ECS needs to be serialization-friendly (for save/load and IPC snapshots). A hand-rolled ECS with serde derives on all components makes this trivial. Framework ECS storage formats are often opaque.
-- Full control over system execution order is critical — the order in which physics systems run (gravity before drag, detonation before shockwave propagation) affects correctness. Frameworks that parallelize or reorder systems would require careful constraint specification.
-- Fewer dependencies = faster compile times, smaller binary, simpler debugging.
+### Decision 3: Fixed-Rate Simulation with Snapshot Broadcasting
 
-**Tradeoff:** No free rendering, no built-in asset pipeline, no editor. These are non-issues because rendering is handled by PixiJS, assets are simple (JSON data + audio files), and the game doesn't need a visual editor.
+**Context:** The simulation must run at consistent speed regardless of rendering frame rate, and must support replay.
 
-### 4. Tauri v2 over Electron
+**Decision:** Simulation runs at a fixed 30Hz tick rate in Rust. After each tick, a complete GameStateSnapshot is serialized and broadcast to the frontend. The frontend interpolates between snapshots for smooth rendering at display refresh rate.
 
-**Decision:** Use Tauri as the application shell instead of Electron.
+**Rationale:** Decouples simulation from rendering. Consistent physics regardless of frame rate. Snapshot sequence IS the replay — no separate recording needed. 30Hz is sufficient for the decision timescales in the game (fastest Veto Clock is ~5 seconds).
 
-**Rationale:**
-- Tauri uses the OS native webview (WebView2 on Windows, WebKit on macOS/Linux) instead of bundling Chromium. Binary size is ~5-10 MB vs. ~150+ MB for Electron.
-- Rust backend is a first-class citizen in Tauri, not a bolted-on native module. The physics engine lives naturally in the same Rust process as the Tauri shell.
-- Lower memory footprint — important for a game that should run comfortably alongside other applications.
-- Tauri v2's mobile support (iOS/Android) provides a future porting path without re-architecting.
+**Tradeoff:** 30Hz introduces up to 33ms of display latency. Acceptable for this game's pace. Interpolation adds frontend complexity. Snapshot serialization is ~50-100KB per tick — manageable but must be profiled.
 
-**Tradeoff:** WebView rendering inconsistencies across platforms (WebKit on Linux can behave differently from WebView2 on Windows). Mitigation: PixiJS abstracts over WebGL and handles cross-browser differences. CRT shaders will need testing across all three platform webviews.
+### Decision 4: JSON for IPC (MessagePack Fallback)
 
-### 5. Event-Driven IPC over Polling
+**Context:** Game state must cross the Rust-TypeScript boundary every tick.
 
-**Decision:** The backend pushes state snapshots and game events to the frontend via Tauri's event system, rather than the frontend polling for state.
+**Decision:** Default to JSON via serde_json. If profiling shows serialization is a bottleneck, switch to MessagePack (rmp-serde) which is binary and ~2-5x faster.
 
-**Rationale:**
-- The simulation runs at its own tick rate — the frontend shouldn't drive when state updates happen.
-- Discrete events (detonation, impact, city destroyed) need to arrive at the exact moment they occur for VFX and audio to sync properly. Polling would miss or batch events.
-- Tauri's event system is asynchronous and non-blocking on both sides. The frontend's render loop and the backend's physics loop run independently.
+**Rationale:** JSON is human-readable and debuggable during development. The expected payload size (50-100KB) should serialize in well under 5ms. MessagePack is a drop-in replacement via serde — same derive macros, different serializer.
 
-**Tradeoff:** Event ordering must be carefully managed. If a "detonation" event and a "state_snapshot" event arrive out of order, the frontend might try to render an explosion for an entity that doesn't exist in the snapshot yet. Mitigation: include a tick counter in all events so the frontend can sequence them correctly.
+**Tradeoff:** JSON is larger and slower than binary formats. Accepted for development velocity with a clear migration path if needed.
 
-### 6. JSON Serialization for IPC and Save Data
+### Decision 5: Preact/Solid Over React for Panel UI
 
-**Decision:** Use serde_json for both IPC state transfer and save file serialization, at least initially.
+**Context:** Panel UI components (VLS status, threat table, Veto Clock display) need reactive rendering but are not complex enough to justify React's bundle size.
 
-**Rationale:**
-- JSON is human-readable, which is invaluable for debugging during development. You can inspect save files and IPC payloads directly.
-- serde_json is the most battle-tested serialization crate in the Rust ecosystem.
-- Tauri's IPC natively supports JSON payloads — no custom serialization layer needed.
+**Decision:** Use Preact or Solid.js for panel UI components. Final choice during Phase 1 scaffolding based on Three.js integration smoothness.
 
-**Tradeoff:** JSON is larger and slower to parse than binary formats (MessagePack, bincode). If 60 Hz state snapshots with 100+ entities cause measurable IPC latency, switch to MessagePack (serde-compatible, drop-in replacement, ~2x faster serialization). This is an optimization to make later if profiling shows it's needed, not an upfront decision.
+**Rationale:** Panels are relatively simple reactive components — data in, DOM out. React's virtual DOM diffing is unnecessary overhead. Preact is API-compatible with React at 3KB. Solid uses fine-grained reactivity with no VDOM at 7KB. Either is sufficient.
 
----
+**Tradeoff:** Smaller ecosystem than React. Fewer ready-made component libraries. Acceptable since the UI is bespoke (CIC aesthetic, not Material Design).
 
-## Testing Strategy
+### Decision 6: Heightmap-Based Terrain (Not Voxel or Mesh)
 
-### Rust Backend
+**Context:** Ground operations require terrain for LOS calculation, radar masking, and 3D visualization.
 
-- **Unit tests per system:** Each ECS system has isolated tests verifying correct physics behavior (e.g., gravity system produces expected velocity after N ticks, drag system correctly scales with altitude)
-- **Determinism tests:** Run identical wave seeds twice, assert byte-identical final state. This is the most critical test category — if determinism breaks, seeded waves and replay become unreliable.
-- **Integration tests:** Full simulation runs of predefined wave scenarios, asserting expected outcomes (e.g., "Wave 5 with seed X, no player input → missiles impact cities A, B, C at ticks T1, T2, T3")
-- **Balance tests:** Automated playthroughs with simple AI strategies to validate difficulty curves, resource pacing, and expansion timing targets
+**Decision:** Use SRTM-derived or similar heightmap data (regular grid of elevation values). Pre-process into efficient query structures at mission load.
 
-### TypeScript Frontend
+**Rationale:** Heightmaps are simple to query (O(1) for a point elevation), efficient for LOS ray-marching, and directly convertible to Three.js terrain meshes. Pre-computing terrain masking tables at mission load amortizes the cost.
 
-- **Interpolation tests:** Verify smooth position interpolation between snapshots, handle edge cases (entity created, entity destroyed between snapshots)
-- **Input mapping tests:** Verify correct command generation from mouse/keyboard input sequences
-- **Visual regression:** Screenshot-based tests for CRT shader output across different viewport sizes
-
-### Cross-Layer
-
-- **Round-trip IPC tests:** Send a command from frontend, verify backend processes it and emits correct events, verify frontend receives and handles events
-- **Performance benchmarks:** Measure IPC latency and render frame time during worst-case scenarios (100+ entities, multiple simultaneous detonations, full CRT shader pipeline)
-
----
-
-*"Two systems, one truth, zero desync."*
+**Tradeoff:** Limited vertical features (overhangs, tunnels — not relevant for radar). Resolution limited by heightmap grid spacing. Acceptable for the simulation fidelity target.
