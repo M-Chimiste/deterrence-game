@@ -1,0 +1,19 @@
+[package]
+name = "deterrence-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+deterrence-core = { path = "../deterrence-core" }
+deterrence-sim = { path = "../deterrence-sim" }
+deterrence-threat-ai = { path = "../deterrence-threat-ai" }
+deterrence-terrain = { path = "../deterrence-terrain" }
+deterrence-procgen = { path = "../deterrence-procgen" }
+deterrence-campaign = { path = "../deterrence-campaign" }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-build = { version = "2", features = [] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

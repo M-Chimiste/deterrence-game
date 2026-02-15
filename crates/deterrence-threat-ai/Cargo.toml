@@ -1,0 +1,9 @@
+[package]
+name = "deterrence-threat-ai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+deterrence-core = { path = "../deterrence-core" }
+glam = { workspace = true }
+rand = { workspace = true }

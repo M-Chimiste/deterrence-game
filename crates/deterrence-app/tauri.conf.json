@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicholasrice/tauri/refs/heads/feat/generate-schema/crates/tauri-cli/schema.json",
+  "productName": "Deterrence",
+  "version": "0.1.0",
+  "identifier": "com.deterrence.app",
+  "build": {
+    "beforeDevCommand": "cd ../../frontend && npm run dev",
+    "beforeBuildCommand": "cd ../../frontend && npm run build",
+    "frontendDist": "../../frontend/dist",
+    "devUrl": "http://localhost:1420"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DETERRENCE",
+        "width": 1280,
+        "height": 720,
+        "minWidth": 1280,
+        "minHeight": 720,
+        "fullscreen": false,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+[package]
+name = "deterrence-campaign"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+deterrence-core = { path = "../deterrence-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }

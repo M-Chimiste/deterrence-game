@@ -1,0 +1,7 @@
+[package]
+name = "deterrence-terrain"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+deterrence-core = { path = "../deterrence-core" }

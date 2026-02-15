@@ -1,0 +1,9 @@
+[package]
+name = "deterrence-procgen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+deterrence-core = { path = "../deterrence-core" }
+deterrence-terrain = { path = "../deterrence-terrain" }
+rand = { workspace = true }

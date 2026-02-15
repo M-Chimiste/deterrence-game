@@ -1,0 +1,331 @@
+/* CIC (Combat Information Center) theme */
+:root {
+  --cic-green: #00ff41;
+  --cic-green-dim: #006618;
+  --cic-bg: #000;
+  --cic-panel-bg: rgba(0, 10, 0, 0.85);
+  --cic-border: rgba(0, 255, 65, 0.2);
+  --cic-font: "JetBrains Mono", "Courier New", monospace;
+}
+
+.app-root {
+  width: 100%;
+  height: 100%;
+  font-family: var(--cic-font);
+  color: var(--cic-green);
+  background: var(--cic-bg);
+}
+
+/* --- Splash screen --- */
+.splash-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-title {
+  font-size: 48px;
+  letter-spacing: 12px;
+  text-shadow: 0 0 20px var(--cic-green), 0 0 40px var(--cic-green);
+  margin-bottom: 24px;
+}
+
+.splash-subtitle {
+  font-size: 14px;
+  opacity: 0.6;
+  letter-spacing: 4px;
+}
+
+.splash-status {
+  margin-top: 48px;
+  font-size: 12px;
+  opacity: 0.4;
+}
+
+/* --- CIC Layout (PPI + overlay panels) --- */
+.cic-layout {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.ppi-container {
+  width: 100%;
+  height: 100%;
+}
+
+.panel-overlay {
+  position: absolute;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.panel-overlay.top-left {
+  top: 8px;
+  left: 8px;
+}
+
+.panel-overlay.top-right {
+  top: 8px;
+  right: 8px;
+}
+
+.panel-overlay.bottom-left {
+  bottom: 8px;
+  left: 8px;
+}
+
+.panel-overlay.right-side {
+  top: 8px;
+  right: 8px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+}
+
+.panel-overlay.bottom-center {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 400px);
+}
+
+/* --- Panel common styles --- */
+.panel {
+  background: var(--cic-panel-bg);
+  border: 1px solid var(--cic-border);
+  padding: 8px 12px;
+  font-size: 12px;
+  min-width: 160px;
+}
+
+.panel-header {
+  font-size: 11px;
+  letter-spacing: 2px;
+  opacity: 0.6;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--cic-border);
+  padding-bottom: 4px;
+}
+
+.panel-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 2px;
+}
+
+/* --- Track Block --- */
+.track-block table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.track-block td {
+  padding: 1px 0;
+}
+
+.track-block td:first-child {
+  opacity: 0.5;
+  padding-right: 12px;
+}
+
+/* --- Radar Status --- */
+.energy-bar-container {
+  margin-top: 6px;
+}
+
+.energy-label {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-bottom: 2px;
+}
+
+.energy-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 255, 65, 0.05);
+  border: 1px solid var(--cic-border);
+  display: flex;
+  overflow: hidden;
+}
+
+.energy-bar-search {
+  height: 100%;
+  background: var(--cic-green-dim);
+  transition: width 0.3s;
+}
+
+.energy-bar-track {
+  height: 100%;
+  background: #665500;
+  transition: width 0.3s;
+}
+
+.energy-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  opacity: 0.4;
+  margin-top: 2px;
+}
+
+/* --- Veto Clock Panel --- */
+.veto-panel {
+  min-width: 200px;
+  max-width: 240px;
+}
+
+.veto-card {
+  border: 1px solid var(--cic-border);
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.veto-card-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.veto-pk {
+  opacity: 0.6;
+}
+
+.veto-timer {
+  font-size: 20px;
+  font-weight: bold;
+  text-align: center;
+  margin: 2px 0;
+}
+
+.veto-bar-bg {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
+}
+
+.veto-bar-fill {
+  height: 100%;
+  transition: width 0.1s linear;
+}
+
+.veto-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.veto-btn {
+  flex: 1;
+  padding: 3px 0;
+  font-family: var(--cic-font);
+  font-size: 10px;
+  letter-spacing: 1px;
+  border: 1px solid var(--cic-border);
+  background: transparent;
+  cursor: pointer;
+}
+
+.veto-btn-veto {
+  color: #ff3333;
+  border-color: rgba(255, 51, 51, 0.4);
+}
+
+.veto-btn-veto:hover {
+  background: rgba(255, 51, 51, 0.15);
+}
+
+.veto-btn-confirm {
+  color: var(--cic-green);
+  border-color: var(--cic-border);
+}
+
+.veto-btn-confirm:hover {
+  background: rgba(0, 255, 65, 0.1);
+}
+
+.veto-status {
+  font-size: 10px;
+  text-align: center;
+  letter-spacing: 1px;
+  padding: 2px 0;
+}
+
+.veto-status.computing {
+  color: #ffaa00;
+  opacity: 0.8;
+}
+
+.veto-status.launched {
+  color: var(--cic-green);
+}
+
+.veto-status.splash-hit {
+  color: var(--cic-green);
+  font-weight: bold;
+}
+
+.veto-status.splash-miss {
+  color: #ff3333;
+}
+
+/* --- Threat Table --- */
+.threat-table {
+  min-width: 420px;
+}
+
+.threat-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.threat-table th {
+  text-align: left;
+  font-size: 10px;
+  opacity: 0.5;
+  letter-spacing: 1px;
+  padding: 2px 6px 4px;
+  border-bottom: 1px solid var(--cic-border);
+}
+
+.threat-table td {
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.threat-table .row-hooked {
+  background: rgba(0, 255, 65, 0.08);
+}
+
+.threat-table .row-hooked td {
+  color: #fff;
+}
+
+.cls-hostile {
+  color: #ff3333;
+}
+
+.cls-suspect {
+  color: #ffaa00;
+}
+
+.cls-unknown {
+  color: var(--cic-green);
+}
+
+.threat-table-footer {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--cic-border);
+  letter-spacing: 1px;
+}
