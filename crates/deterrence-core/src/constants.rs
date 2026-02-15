@@ -84,6 +84,14 @@ pub const ILLUMINATOR_COUNT: u8 = 3;
 /// Duration an illuminator must dwell on a target (seconds).
 pub const ILLUMINATOR_DWELL_TIME: f64 = 3.0;
 
+// --- Missile kinematics ---
+
+/// Boost phase duration for all weapon types (seconds).
+pub const MISSILE_BOOST_DURATION_SECS: f64 = 5.0;
+
+/// Range from target at which interceptor enters terminal guidance (meters).
+pub const TERMINAL_GUIDANCE_RANGE: f64 = 20_000.0;
+
 // --- VLS ---
 
 /// Default number of VLS cells.

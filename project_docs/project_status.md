@@ -3,9 +3,9 @@
 ## Current State
 
 **Branch:** `mk2`
-**Phase:** 5 of 10 complete
-**Tests:** 70 passing (14 core + 38 sim + 5 app + 13 threat-ai), 0 clippy warnings
-**Date:** 2026-02-14
+**Phase:** 6 of 10 complete
+**Tests:** 78 passing (14 core + 46 sim + 5 app + 13 threat-ai), 0 clippy warnings
+**Date:** 2026-02-15
 
 ---
 
@@ -195,3 +195,60 @@
 - `npx vite build` — 523KB bundle
 
 **Next:** Phase 6 — CIC Console Milestone (First Playable)
+
+### Session 6 — 2026-02-15: Phase 6 Complete (CIC Console Milestone — First Playable)
+
+**What was done:**
+- Implemented missile kinematics system:
+  - `systems/missile_kinematics.rs` — Interceptor flight phase transitions: Boost (5s fixed velocity) → Midcourse (retargets velocity toward current target position each tick) → Terminal (gated on illuminator assignment or ER active seeker). Uses collect-then-mutate pattern for hecs borrow safety.
+  - `constants.rs` — Added `MISSILE_BOOST_DURATION_SECS` (5.0s) and `TERMINAL_GUIDANCE_RANGE` (20km)
+  - `components.rs` — Added `phase_start_tick: u64` to MissileState for timing phase transitions
+- Implemented illuminator scheduler system (the core resource tension mechanic):
+  - `systems/illuminator.rs` — 4-step per-tick: release completed/orphaned channels, identify candidates (midcourse engagements within 1.5× terminal range, Standard/PD only), assign idle channels (lowest TTI priority), update time-sharing (cycle illuminators when queue has waiters, Pk penalty proportional to share count)
+  - `components.rs` — Added `dwell_remaining_secs: f64` to Illuminator for time-sharing rotation
+  - `engagement.rs` — Added `illuminator_channel: Option<u8>` to Engagement struct
+  - `engine.rs` — Added `illuminator_queue: Vec<u32>` for cross-cutting illuminator waiting list
+- Updated fire control phase sync:
+  - `systems/fire_control.rs` — Launched arm now matches `Launched | Midcourse | Terminal`, reads interceptor's MissileState and syncs engagement phase to match
+- Updated intercept system with terminal phase gate:
+  - `systems/intercept.rs` — Gates proximity + Pk check on `MissilePhase::Terminal` (or Midcourse for ER missiles). Time-sharing Pk penalty: `effective_pk = base_pk / total_needing_illumination` when queue is non-empty.
+- Updated engine system execution order:
+  - `engine.rs` — fire_control → illuminator (NEW) → missile_kinematics (NEW) → intercept. Wired illuminator_queue through snapshot.
+- Updated snapshot system:
+  - `systems/snapshot.rs` — Wired `illuminator_channel` from engagement, `queue_depth` from illuminator queue length
+- Added 8 new Rust tests:
+  - `test_missile_boost_to_midcourse_transition` — Verifies phase transition after 5s boost
+  - `test_missile_velocity_retargeting_in_midcourse` — Verifies velocity tracks toward target
+  - `test_illuminator_assigned_for_terminal` — Verifies illuminator activation during terminal phase
+  - `test_illuminator_freed_on_completion` — Verifies channels return to Idle after engagement
+  - `test_illuminator_saturation_5_engagements_3_channels` — Verifies at most 3 active channels
+  - `test_intercept_requires_terminal_phase` — Verifies no intercept during Boost/early Midcourse
+  - `test_er_missile_no_illuminator_needed` — Verifies ER missile reaches Terminal without illuminator
+  - `test_full_dcie_end_to_end` — Complete detect → engage → launch → terminal → intercept cycle
+  - `world_setup.rs` — Added `spawn_tracked_threat_at()` test helper for precise range/bearing positioning
+- Built VLS Magazine panel (frontend):
+  - `panels/VLSStatus.tsx` — 8×8 CSS grid of color-coded cells (green=Standard, blue=ER, cyan=PD, amber=Assigned, red=Expended). Summary line: SM/ER/PD/RDY counts.
+- Built Illuminator Status panel (frontend):
+  - `panels/IlluminatorStatus.tsx` — 3 channel rows with status dots (dim green=Idle, bright green=Active, amber=TimeSharing), engagement assignment info, queue depth indicator.
+- Updated VetoClock engagement cards:
+  - `panels/VetoClock.tsx` — Midcourse ("MIDCOURSE — TTI Xs"), Terminal ("TERMINAL — CH N — TTI Xs" or "AWAITING ILLUM")
+- Assembled CIC console layout:
+  - `App.tsx` — Right-column flex container stacking DebugOverlay + VLSStatus + VetoClock + IlluminatorStatus
+  - `styles.css` — VLS grid, illuminator channel, terminal status styles, right-column layout
+
+**Key decisions:**
+- Illuminator system is separate from fire_control (clean separation, one-system-per-file pattern)
+- ER missiles skip illuminator (SM-6 equivalent with active seeker) — meaningful tradeoff: fewer ER cells but no illuminator dependency
+- Standard/PD require illuminator — the core bottleneck: 3 channels shared across all terminal-phase engagements
+- Time-sharing reduces Pk proportionally to share count (saturation has real gameplay cost)
+- MissileState.phase is source of truth; fire_control reads it and syncs EngagementPhase
+- Orphaned illuminator detection handles cleanup timing gap (fire_control removes engagements before illuminator runs)
+
+**Verification:**
+- `cargo test --workspace` — 78 passing (14 core + 46 sim + 5 app + 13 threat-ai)
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo fmt --all --check` — clean
+- `npx tsc --noEmit` — clean
+- `npx vite build` — 525KB bundle
+
+**Next:** Phase 7 — Audio & Polish

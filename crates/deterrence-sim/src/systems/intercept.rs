@@ -1,4 +1,8 @@
 //! Intercept evaluation system — checks missile-target proximity and rolls for kill.
+//!
+//! Intercept is only evaluated when the interceptor is in Terminal phase
+//! (or Midcourse for ER missiles with active seekers). This ensures that
+//! Standard/PD missiles must have illuminator support before engagement.
 
 use std::collections::HashMap;
 
@@ -18,13 +22,18 @@ use crate::engagement::{Engagement, ScoreState};
 pub fn run(
     world: &mut World,
     engagements: &mut HashMap<u32, Engagement>,
+    illuminator_queue: &[u32],
     rng: &mut ChaCha8Rng,
     audio_events: &mut Vec<AudioEvent>,
     score: &mut ScoreState,
     despawn_buffer: &mut Vec<hecs::Entity>,
 ) {
     for eng in engagements.values_mut() {
-        if !matches!(eng.phase, EngagementPhase::Launched) {
+        // Process all in-flight engagements
+        if !matches!(
+            eng.phase,
+            EngagementPhase::Launched | EngagementPhase::Midcourse | EngagementPhase::Terminal
+        ) {
             continue;
         }
 
@@ -56,11 +65,34 @@ pub fn run(
             }
         };
 
+        // Check if missile can evaluate intercept (terminal phase gate)
+        let can_intercept = if let Ok(missile) = world.get::<&MissileState>(interceptor_entity) {
+            match missile.phase {
+                MissilePhase::Terminal => true,
+                // ER missiles have active seekers — can intercept in midcourse
+                MissilePhase::Midcourse => eng.weapon_type == WeaponType::ExtendedRange,
+                _ => false,
+            }
+        } else {
+            false
+        };
+
         let distance = interceptor_pos.range_to(&target_pos);
 
-        // Proximity check
-        if distance <= INTERCEPT_LETHAL_RADIUS {
-            let hit = rng.gen_bool(eng.pk.clamp(0.0, 1.0));
+        // Proximity check — only if missile can intercept
+        if can_intercept && distance <= INTERCEPT_LETHAL_RADIUS {
+            // Calculate effective Pk with time-sharing penalty
+            let effective_pk = if eng.illuminator_channel.is_some() && !illuminator_queue.is_empty()
+            {
+                // Time-sharing: Pk reduced by share count
+                let assigned_count = 1; // this engagement is assigned
+                let total_needing = assigned_count + illuminator_queue.len();
+                eng.pk / total_needing as f64
+            } else {
+                eng.pk
+            };
+
+            let hit = rng.gen_bool(effective_pk.clamp(0.0, 1.0));
 
             if hit {
                 eng.result = Some(InterceptResult::Hit);

@@ -68,6 +68,7 @@ pub fn spawn_illuminators(world: &mut World) {
             channel_id: i,
             status: IlluminatorStatus::default(),
             assigned_engagement: None,
+            dwell_remaining_secs: 0.0,
         },));
     }
 }
@@ -137,6 +138,58 @@ pub fn spawn_tracked_threat(
 
     let bearing: f64 = rng.gen_range(0.0..std::f64::consts::TAU);
     let range: f64 = rng.gen_range(150_000.0..180_000.0);
+
+    let x = range * bearing.sin();
+    let y = range * bearing.cos();
+    let position = Position::new(x, y, altitude);
+
+    let to_origin_bearing = (bearing + std::f64::consts::PI) % std::f64::consts::TAU;
+    let vx = speed * to_origin_bearing.sin();
+    let vy = speed * to_origin_bearing.cos();
+    let velocity = Velocity::new(vx, vy, 0.0);
+
+    let track_number = *next_track;
+    *next_track += 1;
+
+    let track_info = TrackInfo {
+        track_number,
+        quality: 1.0,
+        classification: Classification::Hostile,
+        iff_status: IffStatus::NoValidResponse,
+        hooked: false,
+        hits: TRACK_INITIATE_HITS,
+        misses: 0,
+    };
+
+    let threat_profile = ThreatProfile {
+        archetype,
+        phase: ThreatPhase::Cruise,
+        target: Position::new(0.0, 0.0, 0.0),
+        phase_start_tick: 0,
+        is_engaged: false,
+    };
+
+    world.spawn((
+        Threat,
+        position,
+        velocity,
+        track_info,
+        threat_profile,
+        RadarCrossSection { base_rcs_m2: rcs },
+        PositionHistory::default(),
+    ))
+}
+
+/// Spawn a pre-tracked threat at a specific range and bearing (for precise test control).
+#[cfg(test)]
+pub fn spawn_tracked_threat_at(
+    world: &mut World,
+    next_track: &mut u32,
+    archetype: ThreatArchetype,
+    range: f64,
+    bearing: f64,
+) -> hecs::Entity {
+    let (speed, altitude, rcs) = threat_archetype_params(archetype);
 
     let x = range * bearing.sin();
     let y = range * bearing.cos();

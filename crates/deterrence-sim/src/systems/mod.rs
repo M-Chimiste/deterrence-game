@@ -5,7 +5,9 @@
 
 pub mod cleanup;
 pub mod fire_control;
+pub mod illuminator;
 pub mod intercept;
+pub mod missile_kinematics;
 pub mod movement;
 pub mod radar;
 pub mod snapshot;

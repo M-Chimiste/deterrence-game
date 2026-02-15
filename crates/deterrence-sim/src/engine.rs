@@ -57,6 +57,9 @@ pub struct SimulationEngine {
     next_engagement_id: u32,
     wave_schedule: WaveSchedule,
     score: ScoreState,
+
+    // --- Phase 6 additions ---
+    illuminator_queue: Vec<u32>,
 }
 
 impl SimulationEngine {
@@ -77,6 +80,7 @@ impl SimulationEngine {
             next_engagement_id: 0,
             wave_schedule: WaveSchedule::default(),
             score: ScoreState::default(),
+            illuminator_queue: Vec::new(),
         }
     }
 
@@ -108,6 +112,7 @@ impl SimulationEngine {
             audio_events,
             &self.engagements,
             &self.score,
+            &self.illuminator_queue,
         )
     }
 
@@ -150,6 +155,23 @@ impl SimulationEngine {
         }
     }
 
+    /// Spawn a pre-tracked threat at a specific range/bearing (for precise tests).
+    #[cfg(test)]
+    pub fn spawn_tracked_threat_at(
+        &mut self,
+        archetype: deterrence_core::enums::ThreatArchetype,
+        range: f64,
+        bearing: f64,
+    ) {
+        world_setup::spawn_tracked_threat_at(
+            &mut self.world,
+            &mut self.next_track_number,
+            archetype,
+            range,
+            bearing,
+        );
+    }
+
     /// Get a read-only reference to the engagements map.
     #[cfg(test)]
     pub fn engagements(&self) -> &HashMap<u32, Engagement> {
@@ -179,6 +201,7 @@ impl SimulationEngine {
                     self.score.threats_total = self.wave_schedule.total_threats();
                     self.engagements.clear();
                     self.next_engagement_id = 0;
+                    self.illuminator_queue.clear();
                     self.phase = GamePhase::Active;
                     self.time = SimTime::default();
                 }
@@ -300,20 +323,30 @@ impl SimulationEngine {
             self.doctrine,
             self.time.tick,
         );
-        // 7. Intercept (proximity check, Pk roll)
+        // 7. Illuminator scheduler (assign/release channels, time-sharing)
+        systems::illuminator::run(
+            &mut self.world,
+            &mut self.engagements,
+            &mut self.illuminator_queue,
+            self.time.tick,
+        );
+        // 8. Missile kinematics (phase transitions, velocity retargeting)
+        systems::missile_kinematics::run(&mut self.world, &self.engagements, self.time.tick);
+        // 9. Intercept (proximity check, Pk roll — terminal phase gate)
         systems::intercept::run(
             &mut self.world,
             &mut self.engagements,
+            &self.illuminator_queue,
             &mut self.rng,
             &mut self.audio_events,
             &mut self.score,
             &mut self.despawn_buffer,
         );
-        // 8. Movement integration
+        // 10. Movement integration
         systems::movement::run(&mut self.world);
-        // 9. Position history
+        // 11. Position history
         systems::movement::update_history(&mut self.world, self.time.tick);
-        // 10. Cleanup (OOB, destroyed, completed)
+        // 12. Cleanup (OOB, destroyed, completed)
         systems::cleanup::run(&mut self.world, &mut self.despawn_buffer);
     }
 }

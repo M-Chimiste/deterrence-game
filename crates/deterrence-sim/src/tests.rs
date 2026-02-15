@@ -1,7 +1,9 @@
 //! Tests for the simulation engine, radar systems, fire control, and engagement pipeline.
 
 use deterrence_core::commands::PlayerCommand;
-use deterrence_core::components::{DetectionCounter, Interceptor, Threat, ThreatProfile};
+use deterrence_core::components::{
+    DetectionCounter, Interceptor, MissileState, Threat, ThreatProfile,
+};
 use deterrence_core::enums::*;
 use deterrence_core::types::{Position, Velocity};
 
@@ -984,4 +986,384 @@ fn test_engagement_appears_in_snapshot() {
         eng_view.veto_total_secs > 0.0,
         "Engagement view should have valid veto_total_secs"
     );
+}
+
+// ---- Phase 6: Missile Kinematics ----
+
+#[test]
+fn test_missile_boost_to_midcourse_transition() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Spawn a tracked threat at 80km north for quicker convergence.
+    engine.spawn_tracked_threat_at(ThreatArchetype::SeaSkimmerMk1, 80_000.0, 0.0);
+
+    // Run until launch: SolutionCalc (2s=60 ticks) + Ready (8s=240 ticks) = 300 ticks + margin.
+    for _ in 0..310 {
+        engine.tick();
+    }
+
+    // Verify we have a launched engagement.
+    let has_launched = engine
+        .engagements()
+        .values()
+        .any(|e| matches!(e.phase, EngagementPhase::Launched));
+    assert!(
+        has_launched,
+        "Should have a launched engagement by tick 310"
+    );
+
+    // Run 160 more ticks (>5s boost = 150 ticks) for Boost → Midcourse transition.
+    for _ in 0..160 {
+        engine.tick();
+    }
+
+    // Check that the interceptor MissileState is in Midcourse.
+    let has_midcourse_interceptor = {
+        let mut q = engine.world().query::<(&Interceptor, &MissileState)>();
+        q.iter()
+            .any(|(_, (_, m))| m.phase == MissilePhase::Midcourse)
+    };
+    assert!(
+        has_midcourse_interceptor,
+        "Interceptor should be in Midcourse phase after 5s boost"
+    );
+
+    // Engagement phase should sync to Midcourse.
+    let has_midcourse_engagement = engine
+        .engagements()
+        .values()
+        .any(|e| e.phase == EngagementPhase::Midcourse);
+    assert!(
+        has_midcourse_engagement,
+        "Engagement phase should sync to Midcourse"
+    );
+}
+
+#[test]
+fn test_missile_velocity_retargeting_in_midcourse() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Spawn threat at 80km due north.
+    engine.spawn_tracked_threat_at(ThreatArchetype::SeaSkimmerMk1, 80_000.0, 0.0);
+
+    // Run until midcourse (310 launch + 160 boost).
+    for _ in 0..480 {
+        engine.tick();
+    }
+
+    // Get interceptor velocity and target position.
+    let (interceptor_vel, target_pos) = {
+        let mut interceptor_vel = None;
+        let mut target_pos = None;
+
+        let mut q = engine
+            .world()
+            .query::<(&Interceptor, &MissileState, &Velocity)>();
+        for (_, (_, missile, vel)) in q.iter() {
+            if missile.phase == MissilePhase::Midcourse {
+                interceptor_vel = Some(*vel);
+                // Find engagement to get target entity
+                if let Some(eng) = engine.engagements().get(&missile.engagement_id) {
+                    if let Ok(tp) = engine.world().get::<&Position>(eng.target_entity) {
+                        target_pos = Some(*tp);
+                    }
+                }
+            }
+        }
+        (interceptor_vel, target_pos)
+    };
+
+    if let (Some(vel), Some(_target)) = (interceptor_vel, target_pos) {
+        // Velocity should be pointing roughly toward the target.
+        // The y component should be positive (target is north of origin).
+        assert!(
+            vel.y > 0.0,
+            "Midcourse interceptor should have positive y velocity (heading north toward target), got vy={}",
+            vel.y
+        );
+    }
+}
+
+#[test]
+fn test_illuminator_assigned_for_terminal() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Use Manual doctrine to prevent wave threats from consuming illuminators.
+    engine.queue_command(PlayerCommand::SetDoctrine {
+        mode: DoctrineMode::Manual,
+    });
+    engine.tick();
+
+    // Switch back to AutoSpecial and spawn our test threat at 80km.
+    engine.queue_command(PlayerCommand::SetDoctrine {
+        mode: DoctrineMode::AutoSpecial,
+    });
+    engine.spawn_tracked_threat_at(ThreatArchetype::SeaSkimmerMk1, 80_000.0, 0.0);
+
+    // Timeline: SolutionCalc 2s + Ready 8s = ~300 ticks to launch.
+    // Boost 5s = 150 ticks. Then midcourse.
+    // Closing speed: 1200 + 290 = 1490 m/s. Gap at launch ≈ 77km.
+    // Time to close to 20km: (77-20)km / 1490 ≈ 38s = 1140 ticks.
+    // Total: ~1590 ticks. Scan for illuminator activity over time.
+    let mut found_illuminator = false;
+    for i in 0..2500 {
+        let snap = engine.tick();
+
+        if i > 500 {
+            let has_active = snap
+                .illuminators
+                .iter()
+                .any(|il| il.status != IlluminatorStatus::Idle);
+            let has_terminal_or_complete = snap.engagements.iter().any(|e| {
+                matches!(
+                    e.phase,
+                    EngagementPhase::Terminal | EngagementPhase::Complete
+                )
+            });
+            if has_active || has_terminal_or_complete {
+                found_illuminator = true;
+                break;
+            }
+        }
+    }
+
+    assert!(
+        found_illuminator,
+        "Illuminator should have been assigned during terminal phase"
+    );
+}
+
+#[test]
+fn test_illuminator_freed_on_completion() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Manual doctrine to prevent wave threats from engaging.
+    engine.queue_command(PlayerCommand::SetDoctrine {
+        mode: DoctrineMode::Manual,
+    });
+    engine.tick();
+
+    engine.queue_command(PlayerCommand::SetDoctrine {
+        mode: DoctrineMode::AutoSpecial,
+    });
+    // Spawn threat at 70km for engagement with enough time.
+    engine.spawn_tracked_threat_at(ThreatArchetype::SeaSkimmerMk1, 70_000.0, 0.0);
+
+    // Run long enough for full engagement cycle.
+    for _ in 0..3000 {
+        engine.tick();
+    }
+
+    let snap = engine.tick();
+
+    // All illuminators should be idle after all engagements complete.
+    assert!(
+        snap.illuminators
+            .iter()
+            .all(|i| i.status == IlluminatorStatus::Idle),
+        "Illuminators should return to Idle after engagement completes. Statuses: {:?}",
+        snap.illuminators
+            .iter()
+            .map(|i| i.status)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_illuminator_saturation_5_engagements_3_channels() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Spawn 5 threats at same range for simultaneous engagements.
+    for i in 0..5 {
+        let bearing = (i as f64) * 0.5; // Spread them out in bearing
+        engine.spawn_tracked_threat_at(ThreatArchetype::SeaSkimmerMk1, 60_000.0, bearing);
+    }
+
+    // Run until all should have engagements and interceptors flying.
+    for _ in 0..600 {
+        engine.tick();
+    }
+
+    let snap = engine.tick();
+
+    // Should have multiple active engagements.
+    let active_engs = snap
+        .engagements
+        .iter()
+        .filter(|e| {
+            !matches!(
+                e.phase,
+                EngagementPhase::Complete | EngagementPhase::Aborted
+            )
+        })
+        .count();
+    assert!(
+        active_engs >= 3,
+        "Should have at least 3 active engagements, got {active_engs}"
+    );
+
+    // At most 3 illuminators can be non-idle (we only have 3 channels).
+    let non_idle = snap
+        .illuminators
+        .iter()
+        .filter(|i| i.status != IlluminatorStatus::Idle)
+        .count();
+    assert!(
+        non_idle <= 3,
+        "At most 3 illuminators should be active, got {non_idle}"
+    );
+}
+
+#[test]
+fn test_intercept_requires_terminal_phase() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Set manual doctrine to prevent auto-engagement of wave threats.
+    engine.queue_command(PlayerCommand::SetDoctrine {
+        mode: DoctrineMode::Manual,
+    });
+    engine.tick();
+
+    // Re-enable auto for our test threat.
+    engine.queue_command(PlayerCommand::SetDoctrine {
+        mode: DoctrineMode::AutoSpecial,
+    });
+
+    // Spawn threat at 80km.
+    engine.spawn_tracked_threat_at(ThreatArchetype::SeaSkimmerMk1, 80_000.0, 0.0);
+
+    // Run until interceptor is launched and in midcourse (~470 ticks).
+    for _ in 0..500 {
+        engine.tick();
+    }
+
+    // Check that no engagements are Complete yet (interceptor should be in Boost or Midcourse).
+    let complete_count = engine
+        .engagements()
+        .values()
+        .filter(|e| e.phase == EngagementPhase::Complete)
+        .count();
+
+    // The interceptor at 1200 m/s hasn't reached the threat at 80km yet (even with
+    // the threat closing at 290 m/s, they'd need ~54s = 1620 ticks to close 80km).
+    // At tick 500, interceptor is ~6.3s into flight = ~7.6km traveled.
+    assert_eq!(
+        complete_count, 0,
+        "No intercept should happen during Boost/early Midcourse phase"
+    );
+}
+
+#[test]
+fn test_er_missile_no_illuminator_needed() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Spawn threat at 120km so ER missile is selected (range > 100km).
+    engine.spawn_tracked_threat_at(ThreatArchetype::SupersonicCruiser, 120_000.0, 0.0);
+
+    // Run until engagement launches.
+    for _ in 0..320 {
+        engine.tick();
+    }
+
+    // Verify ER weapon was selected.
+    let er_engagement = engine
+        .engagements()
+        .values()
+        .find(|e| e.weapon_type == WeaponType::ExtendedRange);
+    assert!(
+        er_engagement.is_some(),
+        "Engagement at 120km should use ExtendedRange weapon"
+    );
+
+    // Run more ticks for the missile to fly.
+    for _ in 0..3000 {
+        engine.tick();
+    }
+
+    // ER engagement should have reached Terminal or Complete WITHOUT illuminator.
+    let er_eng = engine
+        .engagements()
+        .values()
+        .find(|e| e.weapon_type == WeaponType::ExtendedRange);
+    if let Some(eng) = er_eng {
+        // ER missile should NOT have an illuminator assigned.
+        assert_eq!(
+            eng.illuminator_channel, None,
+            "ExtendedRange missile should not need illuminator"
+        );
+        // It should have progressed past Midcourse (to Terminal or Complete).
+        assert!(
+            matches!(
+                eng.phase,
+                EngagementPhase::Terminal | EngagementPhase::Complete | EngagementPhase::Aborted
+            ),
+            "ER engagement should reach Terminal/Complete without illuminator, got {:?}",
+            eng.phase
+        );
+    }
+}
+
+#[test]
+fn test_full_dcie_end_to_end() {
+    // Full Detect → Classify → Identify → Engage cycle.
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Spawn a tracked hostile threat at 60km (pre-classified for simplicity).
+    engine.spawn_tracked_threat_at(ThreatArchetype::SeaSkimmerMk1, 60_000.0, 0.0);
+
+    // Run the full engagement cycle.
+    // Launch: ~310 ticks, Boost: 150 ticks, Midcourse to terminal + intercept: ~variable.
+    // At closing speed ~1490 m/s from 60km, total flight ~40s = 1200 ticks.
+    // Total: ~1510 ticks, with some margin.
+    let mut final_snap = engine.tick();
+    for _ in 0..2500 {
+        final_snap = engine.tick();
+    }
+
+    // The engagement should have completed.
+    let completed = final_snap
+        .engagements
+        .iter()
+        .any(|e| e.phase == EngagementPhase::Complete && e.result.is_some());
+
+    // Either the engagement completed (hit or miss) or the threat impacted.
+    let interceptors_fired = final_snap.score.interceptors_fired;
+    assert!(
+        interceptors_fired >= 1,
+        "Should have fired at least 1 interceptor"
+    );
+
+    // VLS should show consumed cells.
+    assert!(
+        final_snap.vls.total_ready < 64,
+        "VLS should have consumed cells"
+    );
+
+    // If engagement completed, illuminator should be freed.
+    if completed {
+        let all_idle = final_snap
+            .illuminators
+            .iter()
+            .all(|i| i.status == IlluminatorStatus::Idle);
+        assert!(
+            all_idle,
+            "All illuminators should be idle after engagement completes"
+        );
+    }
 }

@@ -74,6 +74,16 @@
   right: 8px;
 }
 
+.panel-overlay.right-column {
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+}
+
 .panel-overlay.bottom-left {
   bottom: 8px;
   left: 8px;
@@ -328,4 +338,80 @@
   padding-top: 4px;
   border-top: 1px solid var(--cic-border);
   letter-spacing: 1px;
+}
+
+/* --- VLS Magazine Panel --- */
+.vls-panel {
+  min-width: 200px;
+  max-width: 240px;
+}
+
+.vls-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.vls-cell {
+  aspect-ratio: 1;
+  border-radius: 1px;
+}
+
+.vls-summary {
+  font-size: 9px;
+  opacity: 0.5;
+  letter-spacing: 1px;
+}
+
+/* --- Illuminator Panel --- */
+.illum-panel {
+  min-width: 200px;
+  max-width: 240px;
+}
+
+.illum-channel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+  font-size: 11px;
+}
+
+.illum-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.illum-label {
+  opacity: 0.6;
+  min-width: 32px;
+}
+
+.illum-assign {
+  flex: 1;
+  text-align: right;
+}
+
+.illum-ts {
+  color: #ffaa00;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+.illum-queue {
+  font-size: 9px;
+  opacity: 0.5;
+  letter-spacing: 1px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--cic-border);
+}
+
+/* --- Terminal phase status --- */
+.veto-status.terminal {
+  color: #ffaa00;
+  font-weight: bold;
 }

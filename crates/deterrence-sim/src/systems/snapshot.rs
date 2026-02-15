@@ -15,6 +15,7 @@ use deterrence_core::types::{Position, SimTime, Velocity};
 use crate::engagement::{Engagement, ScoreState};
 
 /// Build a complete GameStateSnapshot from the current world state.
+#[allow(clippy::too_many_arguments)]
 pub fn build_snapshot(
     world: &World,
     time: &SimTime,
@@ -23,6 +24,7 @@ pub fn build_snapshot(
     audio_events: Vec<AudioEvent>,
     engagements: &HashMap<u32, Engagement>,
     score: &ScoreState,
+    illuminator_queue: &[u32],
 ) -> GameStateSnapshot {
     let own_ship_pos = find_own_ship_position(world);
 
@@ -35,7 +37,7 @@ pub fn build_snapshot(
         own_ship: build_own_ship(&own_ship_pos),
         radar: build_radar(world),
         vls: build_vls(world),
-        illuminators: build_illuminators(world),
+        illuminators: build_illuminators(world, illuminator_queue),
         alerts: Vec::new(),
         audio_events,
         score: ScoreView {
@@ -94,7 +96,7 @@ fn build_engagements(engagements: &HashMap<u32, Engagement>) -> Vec<EngagementVi
             pk: e.pk,
             veto_remaining_secs: e.veto_remaining_secs,
             veto_total_secs: e.veto_total_secs,
-            illuminator_channel: None, // Phase 6
+            illuminator_channel: e.illuminator_channel,
             time_to_intercept: e.time_to_intercept,
             result: e.result,
         })
@@ -168,7 +170,9 @@ fn build_vls(world: &World) -> VlsView {
 }
 
 /// Build IlluminatorView list from Illuminator entities.
-fn build_illuminators(world: &World) -> Vec<IlluminatorView> {
+fn build_illuminators(world: &World, illuminator_queue: &[u32]) -> Vec<IlluminatorView> {
+    let queue_depth = illuminator_queue.len() as u32;
+
     let mut illuminators: Vec<IlluminatorView> = world
         .query::<&Illuminator>()
         .iter()
@@ -176,7 +180,7 @@ fn build_illuminators(world: &World) -> Vec<IlluminatorView> {
             channel_id: illum.channel_id,
             status: illum.status,
             assigned_engagement: illum.assigned_engagement,
-            queue_depth: 0, // Phase 6
+            queue_depth,
         })
         .collect();
 

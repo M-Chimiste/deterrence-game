@@ -223,6 +223,7 @@ fn create_new_engagements(
                 veto_total_secs: VETO_CLOCK_DURATION,
                 warned_3s: false,
                 warned_1s: false,
+                illuminator_channel: None,
                 interceptor_entity: None,
                 time_to_intercept: tti,
                 result: None,
@@ -293,7 +294,22 @@ fn advance_engagement(
                 );
             }
         }
-        EngagementPhase::Launched => {
+        EngagementPhase::Launched | EngagementPhase::Midcourse | EngagementPhase::Terminal => {
+            // Sync engagement phase from interceptor's MissileState
+            if let Some(interceptor_e) = eng.interceptor_entity {
+                if let Ok(missile) = world.get::<&MissileState>(interceptor_e) {
+                    let synced_phase = match missile.phase {
+                        MissilePhase::Midcourse => EngagementPhase::Midcourse,
+                        MissilePhase::Terminal => EngagementPhase::Terminal,
+                        _ => eng.phase,
+                    };
+                    if synced_phase != eng.phase {
+                        eng.phase = synced_phase;
+                        eng.phase_start_tick = current_tick;
+                    }
+                }
+            }
+
             // Update time-to-intercept estimate
             if let (Some(interceptor_e), Ok(target_pos)) = (
                 eng.interceptor_entity,
@@ -390,6 +406,7 @@ fn launch_interceptor(
             engagement_id: eng.id,
             fuel_secs,
             weapon_type: eng.weapon_type,
+            phase_start_tick: current_tick,
         },
         TrackInfo {
             track_number,

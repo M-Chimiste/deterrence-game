@@ -116,7 +116,35 @@ function EngagementCard({
           <span class="veto-pk">Pk {(eng.pk * 100).toFixed(0)}%</span>
         </div>
         <div class="veto-status launched">
-          BIRD AWAY — TTI {eng.time_to_intercept.toFixed(1)}s
+          {eng.phase === "Midcourse" ? "MIDCOURSE" : "BIRD AWAY"} — TTI{" "}
+          {eng.time_to_intercept.toFixed(1)}s
+        </div>
+      </div>
+    );
+  }
+
+  if (eng.phase === "Terminal") {
+    const illumInfo =
+      eng.illuminator_channel !== null
+        ? `CH ${eng.illuminator_channel}`
+        : "AWAITING ILLUM";
+
+    return (
+      <div
+        class="veto-card"
+        style={{ borderColor }}
+        onClick={() =>
+          useGameStore.getState().setFocusedEngagement(eng.engagement_id)
+        }
+      >
+        <div class="veto-card-header">
+          <span>
+            TRK {eng.track_number} | {weaponLabel(eng.weapon_type)}
+          </span>
+          <span class="veto-pk">Pk {(eng.pk * 100).toFixed(0)}%</span>
+        </div>
+        <div class="veto-status terminal">
+          TERMINAL — {illumInfo} — TTI {eng.time_to_intercept.toFixed(1)}s
         </div>
       </div>
     );

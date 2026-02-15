@@ -12,6 +12,8 @@ import { TrackBlock } from "./panels/TrackBlock";
 import { RadarStatus } from "./panels/RadarStatus";
 import { VetoClock } from "./panels/VetoClock";
 import { ThreatTable } from "./panels/ThreatTable";
+import { VLSStatus } from "./panels/VLSStatus";
+import { IlluminatorStatus } from "./panels/IlluminatorStatus";
 
 export function App() {
   const snapshot = useGameStore((s) => s.snapshot);
@@ -102,12 +104,11 @@ export function App() {
             <TrackBlock />
           </div>
 
-          <div class="panel-overlay top-right">
+          <div class="panel-overlay right-column">
             <DebugOverlay />
-          </div>
-
-          <div class="panel-overlay right-side">
+            <VLSStatus />
             <VetoClock />
+            <IlluminatorStatus />
           </div>
 
           <div class="panel-overlay bottom-center">

@@ -34,6 +34,10 @@ pub struct Engagement {
     /// Whether the 1-second warning has been emitted.
     pub warned_1s: bool,
 
+    // --- Illuminator ---
+    /// Assigned illuminator channel (if in terminal phase).
+    pub illuminator_channel: Option<u8>,
+
     // --- Interceptor ---
     /// The hecs entity of the launched interceptor (if launched).
     pub interceptor_entity: Option<hecs::Entity>,

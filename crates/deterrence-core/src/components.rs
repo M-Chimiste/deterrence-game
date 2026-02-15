@@ -60,6 +60,8 @@ pub struct MissileState {
     pub fuel_secs: f64,
     /// Weapon type.
     pub weapon_type: WeaponType,
+    /// Tick at which the current phase started.
+    pub phase_start_tick: u64,
 }
 
 /// Radar system component (attached to own-ship or battery).
@@ -95,6 +97,8 @@ pub struct Illuminator {
     pub status: IlluminatorStatus,
     /// Engagement ID currently being illuminated (if any).
     pub assigned_engagement: Option<u32>,
+    /// Remaining dwell time on current assignment (seconds, for time-sharing rotation).
+    pub dwell_remaining_secs: f64,
 }
 
 /// Marks an entity as the player's own ship/battery.
