@@ -12,6 +12,8 @@ use deterrence_core::events::AudioEvent;
 use deterrence_core::state::*;
 use deterrence_core::types::{Position, SimTime, Velocity};
 
+use deterrence_core::constants::TICK_RATE;
+
 use crate::engagement::{Engagement, ScoreState};
 
 /// Build a complete GameStateSnapshot from the current world state.
@@ -21,6 +23,7 @@ pub fn build_snapshot(
     time: &SimTime,
     phase: GamePhase,
     doctrine: DoctrineMode,
+    scenario: Option<ScenarioId>,
     audio_events: Vec<AudioEvent>,
     engagements: &HashMap<u32, Engagement>,
     score: &ScoreState,
@@ -32,6 +35,7 @@ pub fn build_snapshot(
         time: *time,
         phase,
         doctrine,
+        scenario,
         tracks: build_tracks(world, &own_ship_pos),
         engagements: build_engagements(engagements),
         own_ship: build_own_ship(&own_ship_pos),
@@ -45,6 +49,7 @@ pub fn build_snapshot(
             threats_total: score.threats_total,
             interceptors_fired: score.interceptors_fired,
             assets_protected: score.threats_impacted == 0,
+            mission_time_secs: time.tick as f64 / TICK_RATE as f64,
         },
     }
 }

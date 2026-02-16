@@ -14,6 +14,9 @@ import { VetoClock } from "./panels/VetoClock";
 import { ThreatTable } from "./panels/ThreatTable";
 import { VLSStatus } from "./panels/VLSStatus";
 import { IlluminatorStatus } from "./panels/IlluminatorStatus";
+import { DoctrineDisplay } from "./panels/DoctrineDisplay";
+import { ScenarioSelect } from "./screens/ScenarioSelect";
+import { MissionComplete } from "./screens/MissionComplete";
 
 export function App() {
   const snapshot = useGameStore((s) => s.snapshot);
@@ -42,6 +45,23 @@ export function App() {
 
     return () => {
       unlisten?.();
+    };
+  }, []);
+
+  // Init audio on first user gesture (click or keydown)
+  useEffect(() => {
+    function initAudioOnGesture() {
+      useGameStore.getState().initAudio();
+      window.removeEventListener("click", initAudioOnGesture);
+      window.removeEventListener("keydown", initAudioOnGesture);
+    }
+
+    window.addEventListener("click", initAudioOnGesture);
+    window.addEventListener("keydown", initAudioOnGesture);
+
+    return () => {
+      window.removeEventListener("click", initAudioOnGesture);
+      window.removeEventListener("keydown", initAudioOnGesture);
     };
   }, []);
 
@@ -84,11 +104,12 @@ export function App() {
     return () => window.removeEventListener("keydown", handleKeydown);
   }, []);
 
-  const showPPI = phase === "Active" || phase === "Paused";
+  const showCIC = phase === "Active" || phase === "Paused";
+  const showMissionComplete = phase === "MissionComplete";
 
   return (
     <div class="app-root">
-      {showPPI ? (
+      {showCIC ? (
         <div class="cic-layout">
           {/* PPI fills the center */}
           <div class="ppi-container">
@@ -106,6 +127,7 @@ export function App() {
 
           <div class="panel-overlay right-column">
             <DebugOverlay />
+            <DoctrineDisplay />
             <VLSStatus />
             <VetoClock />
             <IlluminatorStatus />
@@ -115,16 +137,15 @@ export function App() {
             <ThreatTable />
           </div>
         </div>
+      ) : showMissionComplete ? (
+        <MissionComplete />
+      ) : connected ? (
+        <ScenarioSelect />
       ) : (
         <div class="splash-screen">
           <h1 class="splash-title">DETERRENCE</h1>
           <p class="splash-subtitle">INTEGRATED AIR AND MISSILE DEFENSE</p>
-          <div class="splash-status">
-            {connected
-              ? `TICK ${snapshot?.time.tick ?? 0} | ${snapshot?.tracks.length ?? 0} TRACKS`
-              : "AWAITING CONNECTION"}
-          </div>
-          <DebugOverlay />
+          <div class="splash-status">AWAITING CONNECTION</div>
         </div>
       )}
     </div>

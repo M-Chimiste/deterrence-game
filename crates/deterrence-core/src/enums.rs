@@ -183,3 +183,12 @@ pub enum AlertLevel {
     Warning,
     Critical,
 }
+
+/// Mission scenario difficulty.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ScenarioId {
+    #[default]
+    Easy,
+    Medium,
+    Hard,
+}

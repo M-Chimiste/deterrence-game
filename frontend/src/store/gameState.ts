@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type { GameStateSnapshot } from "../ipc/state";
+import { MusicManager, SfxEngine, consumeAudioEvents } from "../audio";
+import type { MusicPhase } from "../audio";
 
 /** Duration of the FPS measurement window in seconds. */
 const FPS_WINDOW_SECS = 1.0;
@@ -18,11 +20,42 @@ interface GameStore {
   snapshotRate: number;
   /** Currently focused engagement ID (for veto/confirm keybinds). */
   focusedEngagementId: number | null;
+  /** Whether the audio system has been initialized (requires user gesture). */
+  audioInitialized: boolean;
+
+  musicManager: MusicManager;
+  sfxEngine: SfxEngine;
 
   setSnapshot: (snapshot: GameStateSnapshot) => void;
   setConnected: (connected: boolean) => void;
   setFocusedEngagement: (id: number | null) => void;
   cycleFocusedEngagement: () => void;
+  initAudio: () => void;
+}
+
+/** Determine music phase from game state. */
+function getMusicPhase(snapshot: GameStateSnapshot): MusicPhase {
+  switch (snapshot.phase) {
+    case "MainMenu":
+    case "MissionBriefing":
+      return "menu";
+    case "Active": {
+      switch (snapshot.scenario) {
+        case "Medium":
+          return "level2";
+        case "Hard":
+          return "level3";
+        default:
+          return "level1";
+      }
+    }
+    case "Paused":
+      return "silent";
+    case "MissionComplete":
+      return "gameover";
+    default:
+      return "silent";
+  }
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -34,6 +67,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   fpsWindowStart: performance.now(),
   snapshotRate: 0,
   focusedEngagementId: null,
+  audioInitialized: false,
+
+  musicManager: new MusicManager(),
+  sfxEngine: new SfxEngine(),
 
   setSnapshot: (snapshot: GameStateSnapshot) => {
     const now = performance.now();
@@ -58,6 +95,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       )
     ) {
       focusedEngagementId = null;
+    }
+
+    // Consume audio events from this snapshot
+    if (state.audioInitialized && snapshot.audio_events.length > 0) {
+      consumeAudioEvents(snapshot.audio_events, state.sfxEngine);
+    }
+
+    // Update music phase based on game state
+    if (state.audioInitialized) {
+      const musicPhase = getMusicPhase(snapshot);
+      state.musicManager.setPhase(musicPhase);
     }
 
     set({
@@ -92,5 +140,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
     );
     const nextIdx = (currentIdx + 1) % active.length;
     set({ focusedEngagementId: active[nextIdx].engagement_id });
+  },
+
+  initAudio: () => {
+    const state = get();
+    if (state.audioInitialized) return;
+
+    state.musicManager.init();
+    state.sfxEngine.init();
+    set({ audioInitialized: true });
+
+    // Set initial music phase from current snapshot
+    if (state.snapshot) {
+      const musicPhase = getMusicPhase(state.snapshot);
+      state.musicManager.setPhase(musicPhase);
+    }
   },
 }));

@@ -11,13 +11,14 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 use deterrence_core::commands::PlayerCommand;
-use deterrence_core::components::{OwnShip, RadarSystem, TrackInfo};
-use deterrence_core::enums::{DoctrineMode, EngagementPhase, GamePhase};
+use deterrence_core::components::{OwnShip, RadarSystem, Threat, TrackInfo};
+use deterrence_core::enums::{DoctrineMode, EngagementPhase, GamePhase, ScenarioId};
 use deterrence_core::events::AudioEvent;
 use deterrence_core::state::GameStateSnapshot;
 use deterrence_core::types::SimTime;
 
 use crate::engagement::{Engagement, ScoreState};
+use crate::scenario;
 use crate::systems;
 use crate::systems::wave_spawner::WaveSchedule;
 use crate::world_setup;
@@ -60,6 +61,9 @@ pub struct SimulationEngine {
 
     // --- Phase 6 additions ---
     illuminator_queue: Vec<u32>,
+
+    // --- Phase 7 additions ---
+    selected_scenario: ScenarioId,
 }
 
 impl SimulationEngine {
@@ -81,6 +85,7 @@ impl SimulationEngine {
             wave_schedule: WaveSchedule::default(),
             score: ScoreState::default(),
             illuminator_queue: Vec::new(),
+            selected_scenario: ScenarioId::default(),
         }
     }
 
@@ -103,12 +108,23 @@ impl SimulationEngine {
             self.time.advance();
         }
 
+        // Determine active scenario for snapshot
+        let active_scenario = if matches!(
+            self.phase,
+            GamePhase::Active | GamePhase::Paused | GamePhase::MissionComplete
+        ) {
+            Some(self.selected_scenario)
+        } else {
+            None
+        };
+
         let audio_events = std::mem::take(&mut self.audio_events);
         systems::snapshot::build_snapshot(
             &self.world,
             &self.time,
             self.phase,
             self.doctrine,
+            active_scenario,
             audio_events,
             &self.engagements,
             &self.score,
@@ -194,16 +210,30 @@ impl SimulationEngine {
     /// Handle a single player command.
     fn handle_command(&mut self, command: PlayerCommand) {
         match command {
+            PlayerCommand::SelectScenario { scenario } => {
+                if matches!(self.phase, GamePhase::MainMenu | GamePhase::MissionBriefing) {
+                    self.selected_scenario = scenario;
+                }
+            }
             PlayerCommand::StartMission => {
                 if matches!(self.phase, GamePhase::MainMenu | GamePhase::MissionBriefing) {
                     world_setup::setup_mission(&mut self.world);
-                    self.wave_schedule = WaveSchedule::default_mission();
+                    self.wave_schedule = scenario::build_schedule(self.selected_scenario);
+                    self.score = ScoreState::default();
                     self.score.threats_total = self.wave_schedule.total_threats();
                     self.engagements.clear();
                     self.next_engagement_id = 0;
+                    self.next_track_number = 0;
                     self.illuminator_queue.clear();
                     self.phase = GamePhase::Active;
                     self.time = SimTime::default();
+                }
+            }
+            PlayerCommand::ReturnToMenu => {
+                if self.phase == GamePhase::MissionComplete {
+                    self.world.clear();
+                    self.phase = GamePhase::MainMenu;
+                    self.selected_scenario = ScenarioId::default();
                 }
             }
             PlayerCommand::Pause => {
@@ -348,5 +378,39 @@ impl SimulationEngine {
         systems::movement::update_history(&mut self.world, self.time.tick);
         // 12. Cleanup (OOB, destroyed, completed)
         systems::cleanup::run(&mut self.world, &mut self.despawn_buffer);
+
+        // 13. Mission complete check
+        self.check_mission_complete();
+    }
+
+    /// Check if the mission is complete: all waves spawned and no active threats remain.
+    fn check_mission_complete(&mut self) {
+        if !self.wave_schedule.all_spawned() {
+            return;
+        }
+
+        // Check for any remaining threat entities
+        let has_active_threats = {
+            let mut query = self.world.query::<&Threat>();
+            query.iter().next().is_some()
+        };
+
+        if has_active_threats {
+            return;
+        }
+
+        // Check for any in-flight engagements (not Complete or Aborted)
+        let has_active_engagements = self.engagements.values().any(|e| {
+            !matches!(
+                e.phase,
+                EngagementPhase::Complete | EngagementPhase::Aborted
+            )
+        });
+
+        if has_active_engagements {
+            return;
+        }
+
+        self.phase = GamePhase::MissionComplete;
     }
 }

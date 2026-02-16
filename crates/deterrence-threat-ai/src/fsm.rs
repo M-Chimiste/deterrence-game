@@ -25,8 +25,13 @@ pub struct ThreatContext {
 /// Output from the threat FSM.
 pub struct ThreatUpdate {
     pub new_phase: ThreatPhase,
+    /// Target velocity. When `smooth` is true, the ECS system should
+    /// interpolate from current velocity toward this target using acceleration limits.
     pub new_velocity: Velocity,
     pub phase_changed: bool,
+    /// Whether velocity change should be gradual (acceleration-limited).
+    /// False for terminal states (Destroyed/Impact) and no-change ticks.
+    pub smooth: bool,
 }
 
 /// Evaluate the FSM for one threat. Returns the updated phase and velocity.
@@ -35,6 +40,7 @@ pub fn evaluate(ctx: &ThreatContext) -> ThreatUpdate {
         new_phase: ctx.phase,
         new_velocity: ctx.velocity,
         phase_changed: false,
+        smooth: false,
     };
 
     // Terminal states — no transitions
@@ -65,6 +71,7 @@ fn evaluate_cruise(
                 new_phase: ThreatPhase::PopUp,
                 new_velocity: new_vel,
                 phase_changed: true,
+                smooth: true,
             };
         }
     }
@@ -76,6 +83,7 @@ fn evaluate_cruise(
             new_phase: ThreatPhase::Terminal,
             new_velocity: new_vel,
             phase_changed: true,
+            smooth: true,
         };
     }
 
@@ -85,6 +93,7 @@ fn evaluate_cruise(
             new_phase: ThreatPhase::Impact,
             new_velocity: Velocity::new(0.0, 0.0, 0.0),
             phase_changed: true,
+            smooth: false,
         };
     }
 
@@ -92,6 +101,7 @@ fn evaluate_cruise(
         new_phase: ctx.phase,
         new_velocity: ctx.velocity,
         phase_changed: false,
+        smooth: false,
     }
 }
 
@@ -106,6 +116,7 @@ fn evaluate_popup(
             new_phase: ThreatPhase::Terminal,
             new_velocity: new_vel,
             phase_changed: true,
+            smooth: true,
         };
     }
 
@@ -113,6 +124,7 @@ fn evaluate_popup(
         new_phase: ctx.phase,
         new_velocity: ctx.velocity,
         phase_changed: false,
+        smooth: false,
     }
 }
 
@@ -126,6 +138,7 @@ fn evaluate_terminal(
             new_phase: ThreatPhase::Impact,
             new_velocity: Velocity::new(0.0, 0.0, 0.0),
             phase_changed: true,
+            smooth: false,
         };
     }
 
@@ -136,6 +149,7 @@ fn evaluate_terminal(
             new_phase: ThreatPhase::Evasive,
             new_velocity: new_vel,
             phase_changed: true,
+            smooth: true,
         };
     }
 
@@ -143,6 +157,7 @@ fn evaluate_terminal(
         new_phase: ctx.phase,
         new_velocity: ctx.velocity,
         phase_changed: false,
+        smooth: false,
     }
 }
 
@@ -153,6 +168,7 @@ fn evaluate_evasive(ctx: &ThreatContext) -> ThreatUpdate {
             new_phase: ThreatPhase::Impact,
             new_velocity: Velocity::new(0.0, 0.0, 0.0),
             phase_changed: true,
+            smooth: false,
         };
     }
 
@@ -160,6 +176,7 @@ fn evaluate_evasive(ctx: &ThreatContext) -> ThreatUpdate {
         new_phase: ctx.phase,
         new_velocity: ctx.velocity,
         phase_changed: false,
+        smooth: false,
     }
 }
 
@@ -194,8 +211,11 @@ fn compute_terminal_velocity(
     let heading_to_target = dx.atan2(dy);
 
     // Vertical component: dive back to sea level (or steep dive for ballistic)
-    let vz = if profile.terminal_dive {
-        // Ballistic: steep dive proportional to altitude
+    let vz = if profile.terminal_dive && profile.terminal_dive_angle > 0.0 {
+        // Ballistic: use configured dive angle
+        -new_speed * profile.terminal_dive_angle.sin()
+    } else if profile.terminal_dive {
+        // Fallback: dive proportional to altitude
         let dive_angle = (ctx.position.z / horiz_dist).atan();
         -new_speed * dive_angle.sin()
     } else if ctx.position.z > profile.cruise_altitude + 10.0 {

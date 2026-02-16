@@ -7,6 +7,7 @@ import type {
   Classification,
   DoctrineMode,
   RadarMode,
+  ScenarioId,
 } from "./state";
 
 export type PlayerCommand =
@@ -23,6 +24,8 @@ export type PlayerCommand =
   | { type: "SetRadarMode"; mode: RadarMode }
   | { type: "SetDoctrine"; mode: DoctrineMode }
   | { type: "SetTimeScale"; scale: number }
+  | { type: "SelectScenario"; scenario: ScenarioId }
   | { type: "StartMission" }
+  | { type: "ReturnToMenu" }
   | { type: "Pause" }
   | { type: "Resume" };

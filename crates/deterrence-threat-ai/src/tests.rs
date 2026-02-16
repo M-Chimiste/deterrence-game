@@ -243,4 +243,112 @@ mod tests {
         assert!(!update.phase_changed);
         assert_eq!(update.new_phase, ThreatPhase::Impact);
     }
+
+    // ---- Phase 7: Enhanced Kinematics ----
+
+    #[test]
+    fn test_smooth_flag_on_phase_transitions() {
+        // Phase transitions should have smooth=true (except Impact)
+        let cruise_to_popup = make_context(
+            ThreatArchetype::SeaSkimmerMk1,
+            ThreatPhase::Cruise,
+            THREAT_POPUP_RANGE - 100.0,
+            false,
+            0.0,
+        );
+        let update = evaluate(&cruise_to_popup);
+        assert!(update.smooth, "Cruise→PopUp should be smooth");
+
+        let cruise_to_terminal = make_context(
+            ThreatArchetype::SupersonicCruiser,
+            ThreatPhase::Cruise,
+            THREAT_TERMINAL_RANGE - 100.0,
+            false,
+            0.0,
+        );
+        let update = evaluate(&cruise_to_terminal);
+        assert!(update.smooth, "Cruise→Terminal should be smooth");
+
+        // Impact should NOT be smooth
+        let terminal_to_impact = make_context(
+            ThreatArchetype::SeaSkimmerMk1,
+            ThreatPhase::Terminal,
+            THREAT_IMPACT_RANGE - 10.0,
+            false,
+            5.0,
+        );
+        let update = evaluate(&terminal_to_impact);
+        assert!(!update.smooth, "Terminal→Impact should NOT be smooth");
+    }
+
+    #[test]
+    fn test_ballistic_dive_angle_uses_profile() {
+        use crate::profiles::get_profile;
+
+        let profile = get_profile(ThreatArchetype::TacticalBallistic);
+        assert!(
+            profile.terminal_dive_angle > 0.0,
+            "TacticalBallistic should have a non-zero dive angle"
+        );
+
+        // Verify the dive velocity uses the configured angle
+        let ctx = ThreatContext {
+            archetype: ThreatArchetype::TacticalBallistic,
+            phase: ThreatPhase::Cruise,
+            position: Position::new(0.0, THREAT_TERMINAL_RANGE - 100.0, 30_000.0),
+            velocity: Velocity::new(0.0, -1500.0, 0.0),
+            target: Position::new(0.0, 0.0, 0.0),
+            range_to_target: THREAT_TERMINAL_RANGE - 100.0,
+            is_engaged: false,
+            elapsed_in_phase_secs: 0.0,
+        };
+        let update = evaluate(&ctx);
+        let expected_vz = -profile.cruise_speed
+            * profile.terminal_speed_factor
+            * profile.terminal_dive_angle.sin();
+        let actual_vz = update.new_velocity.z;
+        // Within 10% tolerance
+        assert!(
+            (actual_vz - expected_vz).abs() / expected_vz.abs() < 0.1,
+            "Dive vz should match profile angle: expected {expected_vz:.1}, got {actual_vz:.1}"
+        );
+    }
+
+    #[test]
+    fn test_profile_kinematic_fields_populated() {
+        use crate::profiles::get_profile;
+
+        // Verify all archetypes have valid kinematic parameters
+        let archetypes = [
+            ThreatArchetype::SeaSkimmerMk1,
+            ThreatArchetype::SeaSkimmerMk2,
+            ThreatArchetype::SupersonicCruiser,
+            ThreatArchetype::SubsonicDrone,
+            ThreatArchetype::TacticalBallistic,
+        ];
+
+        for archetype in &archetypes {
+            let profile = get_profile(*archetype);
+            assert!(
+                profile.acceleration > 0.0,
+                "{:?} should have positive acceleration",
+                archetype
+            );
+            assert!(
+                profile.deceleration > 0.0,
+                "{:?} should have positive deceleration",
+                archetype
+            );
+            assert!(
+                profile.max_climb_rate > 0.0,
+                "{:?} should have positive max_climb_rate",
+                archetype
+            );
+            assert!(
+                profile.max_descent_rate > 0.0,
+                "{:?} should have positive max_descent_rate",
+                archetype
+            );
+        }
+    }
 }

@@ -7,6 +7,7 @@ export interface GameStateSnapshot {
   time: SimTime;
   phase: GamePhase;
   doctrine: DoctrineMode;
+  scenario: ScenarioId | null;
   tracks: TrackView[];
   engagements: EngagementView[];
   own_ship: OwnShipView;
@@ -93,6 +94,7 @@ export interface ScoreView {
   threats_total: number;
   interceptors_fired: number;
   assets_protected: boolean;
+  mission_time_secs: number;
 }
 
 export interface Alert {
@@ -152,6 +154,8 @@ export type CellStatus =
   | { Assigned: WeaponType }
   | "Expended"
   | "Empty";
+
+export type ScenarioId = "Easy" | "Medium" | "Hard";
 
 export type AudioEvent =
   | { type: "NewContact"; bearing: number; track_number: number }

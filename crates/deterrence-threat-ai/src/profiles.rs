@@ -24,6 +24,16 @@ pub struct ThreatBehaviorProfile {
     pub can_evade: bool,
     /// Whether terminal phase includes a dive (e.g., ballistic).
     pub terminal_dive: bool,
+    /// Acceleration rate (m/s²) for speed increases.
+    pub acceleration: f64,
+    /// Deceleration rate (m/s²) for speed decreases.
+    pub deceleration: f64,
+    /// Maximum climb rate (m/s).
+    pub max_climb_rate: f64,
+    /// Maximum descent rate (m/s, positive value).
+    pub max_descent_rate: f64,
+    /// Terminal dive angle (radians) for ballistic types.
+    pub terminal_dive_angle: f64,
 }
 
 /// Get the behavioral profile for a given archetype.
@@ -41,6 +51,11 @@ pub fn get_profile(archetype: ThreatArchetype) -> ThreatBehaviorProfile {
             popup_altitude: THREAT_POPUP_ALTITUDE,
             can_evade: false,
             terminal_dive: false,
+            acceleration: 30.0,
+            deceleration: 20.0,
+            max_climb_rate: 50.0,
+            max_descent_rate: 40.0,
+            terminal_dive_angle: 0.0,
         },
         ThreatArchetype::SeaSkimmerMk2 => ThreatBehaviorProfile {
             cruise_speed: SEA_SKIMMER_SPEED * 1.1,
@@ -52,6 +67,11 @@ pub fn get_profile(archetype: ThreatArchetype) -> ThreatBehaviorProfile {
             popup_altitude: THREAT_POPUP_ALTITUDE,
             can_evade: true,
             terminal_dive: false,
+            acceleration: 35.0,
+            deceleration: 25.0,
+            max_climb_rate: 60.0,
+            max_descent_rate: 50.0,
+            terminal_dive_angle: 0.0,
         },
         ThreatArchetype::SupersonicCruiser => ThreatBehaviorProfile {
             cruise_speed: SUPERSONIC_CRUISER_SPEED,
@@ -63,6 +83,11 @@ pub fn get_profile(archetype: ThreatArchetype) -> ThreatBehaviorProfile {
             popup_altitude: 0.0,
             can_evade: false,
             terminal_dive: false,
+            acceleration: 80.0,
+            deceleration: 40.0,
+            max_climb_rate: 200.0,
+            max_descent_rate: 200.0,
+            terminal_dive_angle: 0.0,
         },
         ThreatArchetype::SubsonicDrone => ThreatBehaviorProfile {
             cruise_speed: 100.0,
@@ -74,6 +99,11 @@ pub fn get_profile(archetype: ThreatArchetype) -> ThreatBehaviorProfile {
             popup_altitude: 0.0,
             can_evade: false,
             terminal_dive: false,
+            acceleration: 10.0,
+            deceleration: 10.0,
+            max_climb_rate: 20.0,
+            max_descent_rate: 20.0,
+            terminal_dive_angle: 0.0,
         },
         ThreatArchetype::TacticalBallistic => ThreatBehaviorProfile {
             cruise_speed: 1500.0,
@@ -85,6 +115,11 @@ pub fn get_profile(archetype: ThreatArchetype) -> ThreatBehaviorProfile {
             popup_altitude: 0.0,
             can_evade: false,
             terminal_dive: true,
+            acceleration: 200.0,
+            deceleration: 100.0,
+            max_climb_rate: 500.0,
+            max_descent_rate: 1000.0,
+            terminal_dive_angle: 1.2, // ~69 degrees, steep dive
         },
     }
 }

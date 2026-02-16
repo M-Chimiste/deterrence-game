@@ -81,6 +81,55 @@ pub fn spawn_threat_wave(world: &mut World, rng: &mut ChaCha8Rng, count: usize) 
     }
 }
 
+/// Spawn a threat at a specific bearing with random range (150-180km).
+pub fn spawn_threat_at_bearing_random_range(
+    world: &mut World,
+    rng: &mut ChaCha8Rng,
+    archetype: ThreatArchetype,
+    bearing: f64,
+) -> hecs::Entity {
+    let range: f64 = rng.gen_range(150_000.0..180_000.0);
+    spawn_threat_at_bearing(world, rng, archetype, bearing, range)
+}
+
+/// Spawn a threat at a specific bearing and range.
+pub fn spawn_threat_at_bearing(
+    world: &mut World,
+    _rng: &mut ChaCha8Rng,
+    archetype: ThreatArchetype,
+    bearing: f64,
+    range: f64,
+) -> hecs::Entity {
+    let (speed, altitude, rcs) = threat_archetype_params(archetype);
+
+    let x = range * bearing.sin();
+    let y = range * bearing.cos();
+    let position = Position::new(x, y, altitude);
+
+    let to_origin_bearing = (bearing + std::f64::consts::PI) % std::f64::consts::TAU;
+    let vx = speed * to_origin_bearing.sin();
+    let vy = speed * to_origin_bearing.cos();
+    let velocity = Velocity::new(vx, vy, 0.0);
+
+    let threat_profile = ThreatProfile {
+        archetype,
+        phase: ThreatPhase::Cruise,
+        target: Position::new(0.0, 0.0, 0.0),
+        phase_start_tick: 0,
+        is_engaged: false,
+    };
+
+    world.spawn((
+        Threat,
+        position,
+        velocity,
+        DetectionCounter::default(),
+        threat_profile,
+        RadarCrossSection { base_rcs_m2: rcs },
+        PositionHistory::default(),
+    ))
+}
+
 /// Spawn a single threat entity heading toward the origin.
 /// The threat starts undetected — the radar detection system will
 /// promote it to a tracked entity after enough consecutive hits.

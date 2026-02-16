@@ -12,6 +12,7 @@ use deterrence_core::events::AudioEvent;
 use deterrence_core::types::{Position, Velocity};
 
 use crate::engagement::{Engagement, ScoreState};
+use crate::guidance;
 
 /// Run the fire control system for one tick.
 #[allow(clippy::too_many_arguments)]
@@ -202,7 +203,7 @@ fn create_new_engagements(
 
         // Calculate PIP and Pk
         let missile_speed = missile_speed_for_weapon(weapon_type);
-        let (pip, tti) = calculate_pip(&pos, &vel, &own_pos, missile_speed);
+        let (pip, tti) = guidance::calculate_lead_pip(&pos, &vel, &own_pos, missile_speed);
         let pk = calculate_pk(weapon_type, range, quality, rcs);
 
         let eng_id = *next_engagement_id;
@@ -310,15 +311,20 @@ fn advance_engagement(
                 }
             }
 
-            // Update time-to-intercept estimate
-            if let (Some(interceptor_e), Ok(target_pos)) = (
-                eng.interceptor_entity,
-                world.get::<&Position>(eng.target_entity),
-            ) {
-                if let Ok(interceptor_pos) = world.get::<&Position>(interceptor_e) {
-                    let dist = interceptor_pos.range_to(&target_pos);
-                    let speed = missile_speed_for_weapon(eng.weapon_type);
-                    eng.time_to_intercept = dist / speed;
+            // Update time-to-intercept estimate using closing velocity
+            if let Some(interceptor_e) = eng.interceptor_entity {
+                let target_pos = world.get::<&Position>(eng.target_entity).map(|p| *p);
+                let target_vel = world
+                    .get::<&Velocity>(eng.target_entity)
+                    .map(|v| *v)
+                    .unwrap_or_default();
+                if let (Ok(t_pos), Ok(i_pos), Ok(i_vel)) = (
+                    target_pos,
+                    world.get::<&Position>(interceptor_e).map(|p| *p),
+                    world.get::<&Velocity>(interceptor_e).map(|v| *v),
+                ) {
+                    eng.time_to_intercept =
+                        guidance::estimate_tti(&i_pos, &i_vel, &t_pos, &target_vel);
                 }
             }
 
@@ -364,7 +370,8 @@ fn launch_interceptor(
     if let Ok(target_pos) = world.get::<&Position>(eng.target_entity) {
         if let Ok(target_vel) = world.get::<&Velocity>(eng.target_entity) {
             let speed = missile_speed_for_weapon(eng.weapon_type);
-            let (pip, tti) = calculate_pip(&target_pos, &target_vel, &own_pos, speed);
+            let (pip, tti) =
+                guidance::calculate_lead_pip(&target_pos, &target_vel, &own_pos, speed);
             eng.pip = pip;
             eng.time_to_intercept = tti;
         }
@@ -511,31 +518,6 @@ fn missile_speed_for_weapon(weapon_type: WeaponType) -> f64 {
         WeaponType::ExtendedRange => EXTENDED_RANGE_MISSILE_SPEED,
         WeaponType::PointDefense => POINT_DEFENSE_MISSILE_SPEED,
     }
-}
-
-/// Calculate predicted intercept point and time-to-intercept.
-fn calculate_pip(
-    target_pos: &Position,
-    target_vel: &Velocity,
-    own_pos: &Position,
-    missile_speed: f64,
-) -> (Position, f64) {
-    let range = own_pos.range_to(target_pos);
-    let target_speed = target_vel.speed();
-    // Closing speed estimate: missile speed + component of target heading toward us
-    let closing_speed = missile_speed + target_speed * 0.5;
-    let tti = if closing_speed > 0.0 {
-        range / closing_speed
-    } else {
-        range / missile_speed
-    };
-
-    let pip = Position::new(
-        target_pos.x + target_vel.x * tti,
-        target_pos.y + target_vel.y * tti,
-        target_pos.z + target_vel.z * tti,
-    );
-    (pip, tti)
 }
 
 /// Calculate probability of kill.

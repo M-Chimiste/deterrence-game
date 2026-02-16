@@ -191,6 +191,14 @@ pub const POINT_DEFENSE_MISSILE_SPEED: f64 = 1000.0;
 /// Point defense missile max range (meters).
 pub const POINT_DEFENSE_MISSILE_MAX_RANGE: f64 = 30_000.0;
 
+// --- Proportional navigation ---
+
+/// Navigation constant for PN guidance (dimensionless, typically 3-5).
+pub const PN_NAVIGATION_CONSTANT: f64 = 4.0;
+
+/// Maximum turn rate for PN-guided missiles (rad/s, ~28.6 deg/s).
+pub const PN_MAX_TURN_RATE: f64 = 0.5;
+
 // --- Display ---
 
 /// Maximum number of position history dots per track.

@@ -5,6 +5,8 @@
 
 pub mod engagement;
 pub mod engine;
+pub mod guidance;
+pub mod scenario;
 pub mod systems;
 pub mod world_setup;
 

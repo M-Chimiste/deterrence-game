@@ -40,8 +40,12 @@ pub enum PlayerCommand {
     // --- Simulation control ---
     /// Set time scale (1.0 = normal, 2.0 = double, 0.0 = paused).
     SetTimeScale { scale: f64 },
-    /// Start a new mission with the given scenario.
+    /// Select a scenario before starting a mission.
+    SelectScenario { scenario: ScenarioId },
+    /// Start a new mission with the selected scenario.
     StartMission,
+    /// Return to the main menu from mission complete.
+    ReturnToMenu,
     /// Pause the simulation.
     Pause,
     /// Resume the simulation.

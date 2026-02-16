@@ -12,6 +12,7 @@ pub struct GameStateSnapshot {
     pub time: SimTime,
     pub phase: GamePhase,
     pub doctrine: DoctrineMode,
+    pub scenario: Option<ScenarioId>,
     pub tracks: Vec<TrackView>,
     pub engagements: Vec<EngagementView>,
     pub own_ship: OwnShipView,
@@ -122,4 +123,5 @@ pub struct ScoreView {
     pub threats_total: u32,
     pub interceptors_fired: u32,
     pub assets_protected: bool,
+    pub mission_time_secs: f64,
 }

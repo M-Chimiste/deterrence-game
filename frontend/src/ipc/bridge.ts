@@ -10,6 +10,7 @@ import type {
   Classification,
   DoctrineMode,
   RadarMode,
+  ScenarioId,
 } from "./state";
 
 /** Send a player command to the Rust simulation. */
@@ -111,4 +112,14 @@ export async function confirmEngagement(engagementId: number): Promise<void> {
 /** Set engagement doctrine mode. */
 export async function setDoctrine(mode: DoctrineMode): Promise<void> {
   await sendCommand({ type: "SetDoctrine", mode });
+}
+
+/** Select a scenario. */
+export async function selectScenario(scenario: ScenarioId): Promise<void> {
+  await sendCommand({ type: "SelectScenario", scenario });
+}
+
+/** Return to main menu after mission. */
+export async function returnToMenu(): Promise<void> {
+  await sendCommand({ type: "ReturnToMenu" });
 }

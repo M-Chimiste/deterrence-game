@@ -521,9 +521,10 @@ fn test_set_radar_mode_command() {
 #[test]
 fn test_wave_schedule_spawns_at_correct_ticks() {
     let mut engine = SimulationEngine::new(SimConfig::default());
+    // Default scenario is Easy: 3 waves at t=0, t=20s (tick 600), t=40s (tick 1200)
     engine.queue_command(PlayerCommand::StartMission);
 
-    // Tick 1: wave 0 should have spawned 3 threats.
+    // Tick 1: wave 0 should have spawned 3 threats (3x SeaSkimmerMk1).
     engine.tick();
     let threat_count_wave0 = {
         let mut q = engine.world().query::<&Threat>();
@@ -531,23 +532,22 @@ fn test_wave_schedule_spawns_at_correct_ticks() {
     };
     assert_eq!(threat_count_wave0, 3, "Wave 0: 3 threats expected");
 
-    // Run to tick 300: wave 1 should add 3 more threats (2 Mk1 + 1 Supersonic).
-    for _ in 1..301 {
+    // Run to tick 600: wave 1 should add 3 more threats (2 Mk1 + 1 Drone).
+    for _ in 1..601 {
         engine.tick();
     }
     let threat_count_wave1 = {
         let mut q = engine.world().query::<&Threat>();
         q.iter().count()
     };
-    // Original 3 still exist + 3 new = 6 (some may have been despawned via intercepts,
-    // but at this stage they're all still in flight).
+    // Original 3 still exist + 3 new = 6.
     assert!(
         threat_count_wave1 >= 6,
-        "After wave 1 spawn at tick 300: expected >= 6 threats, got {threat_count_wave1}"
+        "After wave 1 spawn at tick 600: expected >= 6 threats, got {threat_count_wave1}"
     );
 
-    // Run to tick 600: wave 2 adds 4 more (2 Mk2 + 1 Supersonic + 1 Drone).
-    for _ in 301..601 {
+    // Run to tick 1200: wave 2 adds 2 more (2x SeaSkimmerMk1).
+    for _ in 601..1201 {
         engine.tick();
     }
     let threat_count_wave2 = {
@@ -555,8 +555,8 @@ fn test_wave_schedule_spawns_at_correct_ticks() {
         q.iter().count()
     };
     assert!(
-        threat_count_wave2 >= 10,
-        "After wave 2 spawn at tick 600: expected >= 10 threats, got {threat_count_wave2}"
+        threat_count_wave2 >= 8,
+        "After wave 2 spawn at tick 1200: expected >= 8 threats, got {threat_count_wave2}"
     );
 }
 
@@ -566,9 +566,9 @@ fn test_score_total_threats_matches_wave_schedule() {
     engine.queue_command(PlayerCommand::StartMission);
     let snap = engine.tick();
 
-    // Default mission: 3 + 3 + 4 = 10 total threats.
+    // Default scenario (Easy): 3 + 3 + 2 = 8 total threats.
     assert_eq!(
-        snap.score.threats_total, 10,
+        snap.score.threats_total, 8,
         "Score.threats_total should match wave schedule total"
     );
 }
@@ -1366,4 +1366,194 @@ fn test_full_dcie_end_to_end() {
             "All illuminators should be idle after engagement completes"
         );
     }
+}
+
+// ---- Phase 7: Scenario System ----
+
+#[test]
+fn test_scenario_easy_wave_count() {
+    let schedule = crate::scenario::build_schedule(ScenarioId::Easy);
+    assert_eq!(schedule.waves.len(), 3, "Easy scenario should have 3 waves");
+    assert_eq!(
+        schedule.total_threats(),
+        8,
+        "Easy scenario should have 8 total threats"
+    );
+}
+
+#[test]
+fn test_scenario_medium_wave_count() {
+    let schedule = crate::scenario::build_schedule(ScenarioId::Medium);
+    assert_eq!(
+        schedule.waves.len(),
+        5,
+        "Medium scenario should have 5 waves"
+    );
+    let total = schedule.total_threats();
+    assert_eq!(
+        total, 12,
+        "Medium scenario should have 12 total threats, got {total}"
+    );
+}
+
+#[test]
+fn test_scenario_hard_wave_count() {
+    let schedule = crate::scenario::build_schedule(ScenarioId::Hard);
+    assert_eq!(schedule.waves.len(), 7, "Hard scenario should have 7 waves");
+    let total = schedule.total_threats();
+    assert!(
+        total >= 20,
+        "Hard scenario should have 20+ threats, got {total}"
+    );
+}
+
+#[test]
+fn test_select_scenario_command() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+
+    // Select Hard scenario before starting.
+    engine.queue_command(PlayerCommand::SelectScenario {
+        scenario: ScenarioId::Hard,
+    });
+    engine.queue_command(PlayerCommand::StartMission);
+    let snap = engine.tick();
+
+    assert_eq!(snap.scenario, Some(ScenarioId::Hard));
+    // Hard scenario has 20+ threats.
+    assert!(
+        snap.score.threats_total >= 20,
+        "Hard scenario total should be 20+, got {}",
+        snap.score.threats_total
+    );
+}
+
+#[test]
+fn test_multi_axis_spawn_bearings() {
+    use deterrence_core::components::Threat;
+    use deterrence_core::types::Position;
+
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    // Medium scenario has threats from North (bearing ~0) and East (bearing ~PI/2).
+    engine.queue_command(PlayerCommand::SelectScenario {
+        scenario: ScenarioId::Medium,
+    });
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.queue_command(PlayerCommand::SetDoctrine {
+        mode: DoctrineMode::Manual,
+    });
+    engine.tick(); // wave 0 spawns from North
+
+    // Wave 0 spawns 3 threats at bearing ~0 (North).
+    let positions: Vec<Position> = {
+        let mut q = engine.world().query::<(&Threat, &Position)>();
+        q.iter().map(|(_, (_, pos))| *pos).collect()
+    };
+    assert_eq!(positions.len(), 3, "Wave 0 should spawn 3 threats");
+    // All should have x near 0 (North bearing = y-axis positive).
+    for pos in &positions {
+        assert!(
+            pos.x.abs() < 5_000.0,
+            "North-bearing threat should have x near 0, got x={}",
+            pos.x
+        );
+        assert!(
+            pos.y > 100_000.0,
+            "North-bearing threat should have y > 100km, got y={}",
+            pos.y
+        );
+    }
+
+    // Run to tick 451 (>15s = tick 450) for wave 1 from East.
+    for _ in 0..450 {
+        engine.tick();
+    }
+
+    let all_positions: Vec<Position> = {
+        let mut q = engine.world().query::<(&Threat, &Position)>();
+        q.iter().map(|(_, (_, pos))| *pos).collect()
+    };
+    // Should now have wave 0 + wave 1 threats (at least 5).
+    assert!(
+        all_positions.len() >= 5,
+        "Should have 5+ threats after wave 1, got {}",
+        all_positions.len()
+    );
+
+    // Some threats should have large positive x (East bearing).
+    let east_threats = all_positions.iter().filter(|p| p.x > 50_000.0).count();
+    assert!(
+        east_threats >= 2,
+        "Should have 2+ threats from East bearing, got {east_threats}"
+    );
+}
+
+#[test]
+fn test_all_spawned_flag() {
+    let mut schedule = crate::scenario::build_schedule(ScenarioId::Easy);
+    assert!(
+        !schedule.all_spawned(),
+        "Should not be all spawned initially"
+    );
+
+    // Mark all waves as spawned.
+    for wave in &mut schedule.waves {
+        wave.spawned = true;
+    }
+    assert!(
+        schedule.all_spawned(),
+        "Should be all spawned after marking all"
+    );
+}
+
+#[test]
+fn test_mission_complete_all_threats_resolved() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    // Use Easy scenario (8 threats, all from North).
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Run long enough for all threats to either be destroyed or impact.
+    // SeaSkimmerMk1 at 290 m/s from ~165km: ~569s = 17070 ticks.
+    // SubsonicDrone at 100 m/s from ~165km: ~1650s = 49500 ticks.
+    // We need all 8 threats to resolve. With AutoSpecial doctrine,
+    // many will be intercepted. Run a generous number of ticks.
+    let mut final_snap = engine.tick();
+    for _ in 0..55_000 {
+        final_snap = engine.tick();
+        if final_snap.phase == GamePhase::MissionComplete {
+            break;
+        }
+    }
+
+    assert_eq!(
+        final_snap.phase,
+        GamePhase::MissionComplete,
+        "Mission should complete after all threats resolve"
+    );
+    assert!(
+        final_snap.score.mission_time_secs > 0.0,
+        "Mission time should be > 0"
+    );
+}
+
+#[test]
+fn test_return_to_menu_command() {
+    let mut engine = SimulationEngine::new(SimConfig::default());
+    engine.queue_command(PlayerCommand::StartMission);
+    engine.tick();
+
+    // Force phase to MissionComplete for testing.
+    // We need to go through the full cycle or just use the engine's internal state.
+    // For simplicity, run enough ticks for all threats to resolve.
+    for _ in 0..55_000 {
+        let snap = engine.tick();
+        if snap.phase == GamePhase::MissionComplete {
+            break;
+        }
+    }
+
+    // Now send ReturnToMenu.
+    engine.queue_command(PlayerCommand::ReturnToMenu);
+    let snap = engine.tick();
+    assert_eq!(snap.phase, GamePhase::MainMenu, "Should return to MainMenu");
 }
