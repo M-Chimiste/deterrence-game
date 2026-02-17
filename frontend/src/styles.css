@@ -103,6 +103,21 @@
   max-width: calc(100% - 400px);
 }
 
+.panel-overlay.top-center {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.view-indicator {
+  font-size: 10px;
+  letter-spacing: 2px;
+  opacity: 0.4;
+  background: var(--cic-panel-bg);
+  border: 1px solid var(--cic-border);
+  padding: 3px 10px;
+}
+
 /* --- Panel common styles --- */
 .panel {
   background: var(--cic-panel-bg);

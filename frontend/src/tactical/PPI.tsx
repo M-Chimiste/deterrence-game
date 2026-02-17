@@ -14,6 +14,7 @@ import * as THREE from "three";
 import { useGameStore } from "../store/gameState";
 import { getInterpolatedTracks } from "../store/interpolation";
 import { TrackRenderer } from "./tracks";
+import { CoastlineRenderer } from "./CoastlineRenderer";
 import { NTDS_COLORS } from "./symbology";
 import { hookTrack, unhookTrack } from "../ipc/bridge";
 
@@ -83,6 +84,9 @@ class PPIScene {
   private sweepLine: THREE.Line;
   private sweepTrail: THREE.Mesh;
   private trackRenderer: TrackRenderer;
+  private coastlineRenderer: CoastlineRenderer;
+  private coastlinesLoaded = false;
+
   constructor(canvas: HTMLCanvasElement) {
     // Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -127,6 +131,9 @@ class PPIScene {
     // Track renderer
     this.trackRenderer = new TrackRenderer(this.dynamicGroup, SYMBOL_SCALE);
 
+    // Coastline renderer (added to static group — coastlines don't change)
+    this.coastlineRenderer = new CoastlineRenderer(this.staticGroup);
+
     this.resize();
   }
 
@@ -140,6 +147,21 @@ class PPIScene {
     const rotation = Math.PI / 2 - snapshot.radar.sweep_angle;
     this.sweepLine.rotation.z = rotation;
     this.sweepTrail.rotation.z = rotation;
+
+    // Load coastlines once when terrain data arrives
+    if (!this.coastlinesLoaded) {
+      const terrainData = useGameStore.getState().terrainData;
+      if (terrainData && terrainData.coastlines.length > 0) {
+        this.coastlineRenderer.setCoastlines(terrainData.coastlines);
+        this.coastlinesLoaded = true;
+      }
+    }
+
+    // Clear coastlines when returning to menu
+    if (snapshot.phase === "MainMenu" && this.coastlinesLoaded) {
+      this.coastlineRenderer.clear();
+      this.coastlinesLoaded = false;
+    }
 
     // Update tracks with interpolation
     const tracks = getInterpolatedTracks();
@@ -207,6 +229,7 @@ class PPIScene {
 
   dispose(): void {
     this.trackRenderer.dispose();
+    this.coastlineRenderer.dispose();
     this.renderer.dispose();
     // Traverse and dispose all geometries/materials
     this.scene.traverse((obj) => {

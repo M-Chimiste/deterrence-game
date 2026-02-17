@@ -22,6 +22,45 @@ pub struct GameStateSnapshot {
     pub alerts: Vec<Alert>,
     pub audio_events: Vec<AudioEvent>,
     pub score: ScoreView,
+    pub terrain_meta: Option<TerrainMeta>,
+}
+
+/// Terrain metadata for frontend display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainMeta {
+    pub theater_name: String,
+    pub center_lat: f64,
+    pub center_lon: f64,
+    pub grid_width: u32,
+    pub grid_height: u32,
+    pub cell_size_arcsec: f64,
+    pub min_elevation: i16,
+    pub max_elevation: i16,
+}
+
+/// Terrain data payload for frontend rendering (fetched once per mission).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainDataPayload {
+    /// Downsampled grid width.
+    pub width: u32,
+    /// Downsampled grid height.
+    pub height: u32,
+    /// Southwest corner latitude (degrees).
+    pub origin_lat: f64,
+    /// Southwest corner longitude (degrees).
+    pub origin_lon: f64,
+    /// Theater center latitude (degrees).
+    pub center_lat: f64,
+    /// Theater center longitude (degrees).
+    pub center_lon: f64,
+    /// Arc-seconds per cell in the downsampled grid.
+    pub cell_size_arcsec: f64,
+    pub min_elevation: i16,
+    pub max_elevation: i16,
+    /// Downsampled elevations (row-major, N→S, W→E).
+    pub elevations: Vec<i16>,
+    /// Coastline polylines in sim-space: each polyline is a flat array [x0,y0, x1,y1, ...].
+    pub coastlines: Vec<Vec<f64>>,
 }
 
 /// A visible track on the tactical display.

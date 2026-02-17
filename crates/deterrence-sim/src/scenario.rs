@@ -1,7 +1,8 @@
 //! Scenario definitions — hardcoded mission wave schedules.
 //!
 //! Each scenario defines wave composition, timing, spawn bearings,
-//! and difficulty progression.
+//! and difficulty progression. Each scenario also has a `TheaterConfig`
+//! that defines geographic placement (for terrain loading).
 
 use std::f64::consts::PI;
 
@@ -10,12 +11,46 @@ use deterrence_core::enums::{ScenarioId, ThreatArchetype};
 
 use crate::systems::wave_spawner::{WaveEntry, WaveSchedule};
 
-/// Build the wave schedule for a given scenario.
-pub fn build_schedule(scenario: ScenarioId) -> WaveSchedule {
+/// Geographic theater configuration for a scenario.
+#[derive(Debug, Clone)]
+pub struct TheaterConfig {
+    /// Human-readable theater name (e.g., "Strait of Hormuz").
+    pub name: &'static str,
+    /// Theater center latitude (degrees).
+    pub center_lat: f64,
+    /// Theater center longitude (degrees).
+    pub center_lon: f64,
+    /// Path to terrain file (.dtrn or .hgt), relative to app root.
+    /// None = open ocean (no terrain loaded).
+    pub terrain_file: Option<&'static str>,
+}
+
+/// Build the wave schedule and theater config for a given scenario.
+pub fn build_schedule(scenario: ScenarioId) -> (WaveSchedule, TheaterConfig) {
     match scenario {
-        ScenarioId::Easy => build_easy(),
-        ScenarioId::Medium => build_medium(),
-        ScenarioId::Hard => build_hard(),
+        ScenarioId::Easy => (build_easy(), theater_open_ocean("Training Area")),
+        ScenarioId::Medium => (build_medium(), theater_open_ocean("Arabian Sea")),
+        ScenarioId::Hard => (build_hard(), theater_strait_of_hormuz()),
+    }
+}
+
+/// Open ocean theater (no terrain).
+fn theater_open_ocean(name: &'static str) -> TheaterConfig {
+    TheaterConfig {
+        name,
+        center_lat: 25.0,
+        center_lon: 56.0,
+        terrain_file: None,
+    }
+}
+
+/// Strait of Hormuz theater (terrain available when .dtrn file exists).
+fn theater_strait_of_hormuz() -> TheaterConfig {
+    TheaterConfig {
+        name: "Strait of Hormuz",
+        center_lat: 26.5,
+        center_lon: 56.2,
+        terrain_file: Some("public/terrain/hormuz_synth.dtrn"),
     }
 }
 

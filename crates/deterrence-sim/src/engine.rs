@@ -14,11 +14,12 @@ use deterrence_core::commands::PlayerCommand;
 use deterrence_core::components::{OwnShip, RadarSystem, Threat, TrackInfo};
 use deterrence_core::enums::{DoctrineMode, EngagementPhase, GamePhase, ScenarioId};
 use deterrence_core::events::AudioEvent;
-use deterrence_core::state::GameStateSnapshot;
+use deterrence_core::state::{GameStateSnapshot, TerrainMeta};
 use deterrence_core::types::SimTime;
+use deterrence_terrain::TerrainGrid;
 
 use crate::engagement::{Engagement, ScoreState};
-use crate::scenario;
+use crate::scenario::{self, TheaterConfig};
 use crate::systems;
 use crate::systems::wave_spawner::WaveSchedule;
 use crate::world_setup;
@@ -64,6 +65,10 @@ pub struct SimulationEngine {
 
     // --- Phase 7 additions ---
     selected_scenario: ScenarioId,
+
+    // --- Phase 8 additions ---
+    terrain: Option<TerrainGrid>,
+    theater: Option<TheaterConfig>,
 }
 
 impl SimulationEngine {
@@ -86,6 +91,8 @@ impl SimulationEngine {
             score: ScoreState::default(),
             illuminator_queue: Vec::new(),
             selected_scenario: ScenarioId::default(),
+            terrain: None,
+            theater: None,
         }
     }
 
@@ -118,6 +125,25 @@ impl SimulationEngine {
             None
         };
 
+        // Build terrain metadata if terrain is loaded
+        let terrain_meta = self.terrain.as_ref().map(|t| {
+            let proj = t.projection();
+            TerrainMeta {
+                theater_name: self
+                    .theater
+                    .as_ref()
+                    .map(|th| th.name.to_string())
+                    .unwrap_or_default(),
+                center_lat: proj.ref_lat(),
+                center_lon: proj.ref_lon(),
+                grid_width: t.header.width,
+                grid_height: t.header.height,
+                cell_size_arcsec: t.header.cell_size,
+                min_elevation: t.header.min_elevation,
+                max_elevation: t.header.max_elevation,
+            }
+        });
+
         let audio_events = std::mem::take(&mut self.audio_events);
         systems::snapshot::build_snapshot(
             &self.world,
@@ -129,6 +155,7 @@ impl SimulationEngine {
             &self.engagements,
             &self.score,
             &self.illuminator_queue,
+            terrain_meta,
         )
     }
 
@@ -150,6 +177,16 @@ impl SimulationEngine {
     /// Get a read-only reference to the ECS world.
     pub fn world(&self) -> &World {
         &self.world
+    }
+
+    /// Get a read-only reference to the loaded terrain grid (if any).
+    pub fn terrain(&self) -> Option<&TerrainGrid> {
+        self.terrain.as_ref()
+    }
+
+    /// Set the terrain grid for terrain-aware systems (LOS masking, etc.).
+    pub fn set_terrain(&mut self, terrain: TerrainGrid) {
+        self.terrain = Some(terrain);
     }
 
     /// Spawn additional undetected threats (for testing).
@@ -218,7 +255,19 @@ impl SimulationEngine {
             PlayerCommand::StartMission => {
                 if matches!(self.phase, GamePhase::MainMenu | GamePhase::MissionBriefing) {
                     world_setup::setup_mission(&mut self.world);
-                    self.wave_schedule = scenario::build_schedule(self.selected_scenario);
+                    let (schedule, theater) = scenario::build_schedule(self.selected_scenario);
+                    self.wave_schedule = schedule;
+
+                    // Attempt to load terrain if the theater specifies a file
+                    self.terrain = theater.terrain_file.and_then(|path| {
+                        let proj = deterrence_terrain::GeoProjection::new(
+                            theater.center_lat,
+                            theater.center_lon,
+                        );
+                        deterrence_terrain::dtrn::load_dtrn(std::path::Path::new(path), &proj).ok()
+                    });
+                    self.theater = Some(theater);
+
                     self.score = ScoreState::default();
                     self.score.threats_total = self.wave_schedule.total_threats();
                     self.engagements.clear();
@@ -234,6 +283,8 @@ impl SimulationEngine {
                     self.world.clear();
                     self.phase = GamePhase::MainMenu;
                     self.selected_scenario = ScenarioId::default();
+                    self.terrain = None;
+                    self.theater = None;
                 }
             }
             PlayerCommand::Pause => {
@@ -332,8 +383,13 @@ impl SimulationEngine {
         systems::threat_ai::run(&mut self.world, self.time.tick, &mut self.audio_events);
         // 3. Radar energy allocation + sweep advance
         systems::radar::energy::run(&mut self.world);
-        // 4. Radar detection (sweep-based Pd checks)
-        systems::radar::detection::run(&mut self.world, &mut self.rng, self.time.tick);
+        // 4. Radar detection (sweep-based Pd checks, terrain LOS masking)
+        systems::radar::detection::run(
+            &mut self.world,
+            &mut self.rng,
+            self.time.tick,
+            self.terrain.as_ref(),
+        );
         // 5. Track lifecycle (promote/drop)
         let events = systems::radar::tracking::run(
             &mut self.world,

@@ -6,7 +6,7 @@
 use tauri::{AppHandle, State};
 
 use deterrence_core::commands::PlayerCommand;
-use deterrence_core::state::GameStateSnapshot;
+use deterrence_core::state::{GameStateSnapshot, TerrainDataPayload};
 
 use crate::game_loop;
 use crate::state::{AppState, GameLoopCommand};
@@ -22,7 +22,11 @@ pub fn start_simulation(app_handle: AppHandle, state: State<'_, AppState>) -> Re
         return Err("Simulation already running".into());
     }
 
-    let cmd_tx = game_loop::spawn_game_loop(app_handle, state.latest_snapshot.clone());
+    let cmd_tx = game_loop::spawn_game_loop(
+        app_handle,
+        state.latest_snapshot.clone(),
+        state.terrain_data.clone(),
+    );
 
     let mut tx_lock = state.command_tx.lock().map_err(|e| e.to_string())?;
     *tx_lock = Some(cmd_tx);
@@ -52,5 +56,15 @@ pub fn send_command(command: PlayerCommand, state: State<'_, AppState>) -> Resul
 #[tauri::command]
 pub fn get_snapshot(state: State<'_, AppState>) -> Result<Option<GameStateSnapshot>, String> {
     let lock = state.latest_snapshot.lock().map_err(|e| e.to_string())?;
+    Ok(lock.clone())
+}
+
+/// Get terrain data for 3D rendering and PPI coastline overlay.
+/// Returns None if no terrain is loaded for the current mission.
+///
+/// Frontend: `invoke("get_terrain_data")`
+#[tauri::command]
+pub fn get_terrain_data(state: State<'_, AppState>) -> Result<Option<TerrainDataPayload>, String> {
+    let lock = state.terrain_data.lock().map_err(|e| e.to_string())?;
     Ok(lock.clone())
 }

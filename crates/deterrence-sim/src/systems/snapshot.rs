@@ -28,6 +28,7 @@ pub fn build_snapshot(
     engagements: &HashMap<u32, Engagement>,
     score: &ScoreState,
     illuminator_queue: &[u32],
+    terrain_meta: Option<TerrainMeta>,
 ) -> GameStateSnapshot {
     let own_ship_pos = find_own_ship_position(world);
 
@@ -51,6 +52,7 @@ pub fn build_snapshot(
             assets_protected: score.threats_impacted == 0,
             mission_time_secs: time.tick as f64 / TICK_RATE as f64,
         },
+        terrain_meta,
     }
 }
 

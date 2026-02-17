@@ -7,6 +7,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { PlayerCommand } from "./commands";
 import type {
   GameStateSnapshot,
+  TerrainDataPayload,
   Classification,
   DoctrineMode,
   RadarMode,
@@ -122,4 +123,9 @@ export async function selectScenario(scenario: ScenarioId): Promise<void> {
 /** Return to main menu after mission. */
 export async function returnToMenu(): Promise<void> {
   await sendCommand({ type: "ReturnToMenu" });
+}
+
+/** Get terrain data for PPI coastline overlay and 3D world view. */
+export async function getTerrainData(): Promise<TerrainDataPayload | null> {
+  return invoke<TerrainDataPayload | null>("get_terrain_data");
 }

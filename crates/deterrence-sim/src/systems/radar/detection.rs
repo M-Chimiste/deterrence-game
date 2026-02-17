@@ -13,6 +13,7 @@ use deterrence_core::components::{
 };
 use deterrence_core::constants::*;
 use deterrence_core::types::Position;
+use deterrence_terrain::TerrainGrid;
 
 /// Half-width of the radar beam in radians.
 fn beam_half_width() -> f64 {
@@ -58,7 +59,15 @@ pub fn compute_pd(range: f64, rcs: f64, search_energy: f64, energy_total: f64) -
 ///
 /// Must be called AFTER energy.rs (so search_energy is current) and
 /// BEFORE tracking.rs (so hit/miss counts are up to date for promotion/drop).
-pub fn run(world: &mut World, rng: &mut ChaCha8Rng, current_tick: u64) {
+///
+/// When terrain is loaded, checks line-of-sight from own-ship to each entity.
+/// Entities occluded by terrain are treated as misses (radar returns blocked).
+pub fn run(
+    world: &mut World,
+    rng: &mut ChaCha8Rng,
+    current_tick: u64,
+    terrain: Option<&TerrainGrid>,
+) {
     // Get own ship position and radar state
     let (own_pos, sweep_angle, sector_center, sector_width, search_energy, energy_total) = {
         let mut q = world.query::<(&OwnShip, &Position, &RadarSystem)>();
@@ -105,6 +114,15 @@ pub fn run(world: &mut World, rng: &mut ChaCha8Rng, current_tick: u64) {
                 continue;
             }
 
+            // Terrain LOS check — if terrain blocks the path, treat as miss
+            if let Some(t) = terrain {
+                if !deterrence_terrain::has_line_of_sight(t, &own_pos, pos) {
+                    counter.misses += 1;
+                    counter.hits = 0;
+                    continue;
+                }
+            }
+
             let pd = compute_pd(range, rcs.base_rcs_m2, search_energy, energy_total);
             let detected = rng.gen_bool(pd.clamp(0.0, 1.0));
 
@@ -138,6 +156,16 @@ pub fn run(world: &mut World, rng: &mut ChaCha8Rng, current_tick: u64) {
                 track.hits = 0;
                 track.quality = (track.quality - TRACK_QUALITY_MISS_LOSS).max(0.0);
                 continue;
+            }
+
+            // Terrain LOS check — occluded tracks degrade quality
+            if let Some(t) = terrain {
+                if !deterrence_terrain::has_line_of_sight(t, &own_pos, pos) {
+                    track.misses += 1;
+                    track.hits = 0;
+                    track.quality = (track.quality - TRACK_QUALITY_MISS_LOSS).max(0.0);
+                    continue;
+                }
             }
 
             let pd = compute_pd(range, rcs.base_rcs_m2, search_energy, energy_total);

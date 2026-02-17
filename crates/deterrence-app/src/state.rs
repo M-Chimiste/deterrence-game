@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 use deterrence_core::commands::PlayerCommand;
-use deterrence_core::state::GameStateSnapshot;
+use deterrence_core::state::{GameStateSnapshot, TerrainDataPayload};
 
 /// Commands sent from the IPC layer to the game loop thread.
 #[derive(Debug)]
@@ -30,6 +30,8 @@ pub struct AppState {
     pub latest_snapshot: Arc<Mutex<Option<GameStateSnapshot>>>,
     /// Whether the game loop is currently running.
     pub running: Mutex<bool>,
+    /// Terrain data payload for frontend rendering (set once per mission by game loop).
+    pub terrain_data: Arc<Mutex<Option<TerrainDataPayload>>>,
 }
 
 impl Default for AppState {
@@ -38,6 +40,7 @@ impl Default for AppState {
             command_tx: Mutex::new(None),
             latest_snapshot: Arc::new(Mutex::new(None)),
             running: Mutex::new(false),
+            terrain_data: Arc::new(Mutex::new(None)),
         }
     }
 }

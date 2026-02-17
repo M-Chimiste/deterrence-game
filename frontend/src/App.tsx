@@ -8,6 +8,7 @@ import {
 } from "./ipc/bridge";
 import { DebugOverlay } from "./debug/DebugOverlay";
 import { PPI } from "./tactical/PPI";
+import { WorldScene } from "./world/WorldScene";
 import { TrackBlock } from "./panels/TrackBlock";
 import { RadarStatus } from "./panels/RadarStatus";
 import { VetoClock } from "./panels/VetoClock";
@@ -21,6 +22,7 @@ import { MissionComplete } from "./screens/MissionComplete";
 export function App() {
   const snapshot = useGameStore((s) => s.snapshot);
   const connected = useGameStore((s) => s.connected);
+  const viewMode = useGameStore((s) => s.viewMode);
   const phase = snapshot?.phase;
 
   useEffect(() => {
@@ -97,6 +99,11 @@ export function App() {
           }
           break;
         }
+        case "w":
+        case "W": {
+          store.toggleViewMode();
+          break;
+        }
       }
     }
 
@@ -111,9 +118,16 @@ export function App() {
     <div class="app-root">
       {showCIC ? (
         <div class="cic-layout">
-          {/* PPI fills the center */}
+          {/* Main view: PPI radar scope or 3D world */}
           <div class="ppi-container">
-            <PPI />
+            {viewMode === "ppi" ? <PPI /> : <WorldScene />}
+          </div>
+
+          {/* View mode indicator */}
+          <div class="panel-overlay top-center">
+            <span class="view-indicator">
+              {viewMode === "ppi" ? "PPI" : "3D"} [W]
+            </span>
           </div>
 
           {/* Overlay panels */}

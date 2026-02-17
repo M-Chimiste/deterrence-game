@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { GameStateSnapshot } from "../ipc/state";
+import type { GameStateSnapshot, TerrainDataPayload } from "../ipc/state";
+import { getTerrainData } from "../ipc/bridge";
 import { MusicManager, SfxEngine, consumeAudioEvents } from "../audio";
 import type { MusicPhase } from "../audio";
 
@@ -22,6 +23,12 @@ interface GameStore {
   focusedEngagementId: number | null;
   /** Whether the audio system has been initialized (requires user gesture). */
   audioInitialized: boolean;
+  /** Terrain data fetched once per mission for PPI overlay and 3D view. */
+  terrainData: TerrainDataPayload | null;
+  /** Whether terrain data has been fetched for the current mission. */
+  terrainFetched: boolean;
+  /** Current view mode: PPI radar scope or 3D world view. */
+  viewMode: "ppi" | "world";
 
   musicManager: MusicManager;
   sfxEngine: SfxEngine;
@@ -31,6 +38,7 @@ interface GameStore {
   setFocusedEngagement: (id: number | null) => void;
   cycleFocusedEngagement: () => void;
   initAudio: () => void;
+  toggleViewMode: () => void;
 }
 
 /** Determine music phase from game state. */
@@ -68,6 +76,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   snapshotRate: 0,
   focusedEngagementId: null,
   audioInitialized: false,
+  terrainData: null,
+  terrainFetched: false,
+  viewMode: "ppi",
 
   musicManager: new MusicManager(),
   sfxEngine: new SfxEngine(),
@@ -108,6 +119,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
       state.musicManager.setPhase(musicPhase);
     }
 
+    // Fetch terrain data once when mission starts with terrain
+    if (
+      snapshot.phase === "Active" &&
+      snapshot.terrain_meta !== null &&
+      !state.terrainFetched
+    ) {
+      set({ terrainFetched: true });
+      getTerrainData().then((data) => {
+        if (data) set({ terrainData: data });
+      });
+    }
+
+    // Clear terrain data when returning to menu
+    if (snapshot.phase === "MainMenu" && state.terrainFetched) {
+      set({ terrainData: null, terrainFetched: false });
+    }
+
     set({
       previousSnapshot: state.snapshot,
       snapshot,
@@ -140,6 +168,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     );
     const nextIdx = (currentIdx + 1) % active.length;
     set({ focusedEngagementId: active[nextIdx].engagement_id });
+  },
+
+  toggleViewMode: () => {
+    const current = get().viewMode;
+    set({ viewMode: current === "ppi" ? "world" : "ppi" });
   },
 
   initAudio: () => {

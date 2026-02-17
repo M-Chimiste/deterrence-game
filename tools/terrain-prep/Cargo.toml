@@ -1,0 +1,13 @@
+[package]
+name = "terrain-prep"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "terrain-prep"
+path = "src/main.rs"
+
+[dependencies]
+deterrence-terrain = { path = "../../crates/deterrence-terrain" }
+deterrence-core = { path = "../../crates/deterrence-core" }

@@ -7,6 +7,7 @@ members = [
     "crates/deterrence-procgen",
     "crates/deterrence-campaign",
     "crates/deterrence-app",
+    "tools/terrain-prep",
 ]
 resolver = "2"
 

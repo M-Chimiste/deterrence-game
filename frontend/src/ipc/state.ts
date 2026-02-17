@@ -17,6 +17,32 @@ export interface GameStateSnapshot {
   alerts: Alert[];
   audio_events: AudioEvent[];
   score: ScoreView;
+  terrain_meta: TerrainMeta | null;
+}
+
+export interface TerrainMeta {
+  theater_name: string;
+  center_lat: number;
+  center_lon: number;
+  grid_width: number;
+  grid_height: number;
+  cell_size_arcsec: number;
+  min_elevation: number;
+  max_elevation: number;
+}
+
+export interface TerrainDataPayload {
+  width: number;
+  height: number;
+  origin_lat: number;
+  origin_lon: number;
+  center_lat: number;
+  center_lon: number;
+  cell_size_arcsec: number;
+  min_elevation: number;
+  max_elevation: number;
+  elevations: number[];
+  coastlines: number[][];
 }
 
 export interface SimTime {

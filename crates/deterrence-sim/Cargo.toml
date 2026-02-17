@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 deterrence-core = { path = "../deterrence-core" }
 deterrence-threat-ai = { path = "../deterrence-threat-ai" }
+deterrence-terrain = { path = "../deterrence-terrain" }
 hecs = { workspace = true }
 glam = { workspace = true }
 serde = { workspace = true }

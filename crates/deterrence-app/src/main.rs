@@ -11,6 +11,7 @@ fn main() {
             ipc::start_simulation,
             ipc::send_command,
             ipc::get_snapshot,
+            ipc::get_terrain_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running DETERRENCE");

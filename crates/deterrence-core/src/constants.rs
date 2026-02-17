@@ -199,6 +199,17 @@ pub const PN_NAVIGATION_CONSTANT: f64 = 4.0;
 /// Maximum turn rate for PN-guided missiles (rad/s, ~28.6 deg/s).
 pub const PN_MAX_TURN_RATE: f64 = 0.5;
 
+// --- Terrain ---
+
+/// Line-of-sight sampling interval in meters.
+pub const TERRAIN_LOS_SAMPLE_INTERVAL: f64 = 100.0;
+
+/// Mean Earth radius in meters.
+pub const EARTH_RADIUS_M: f64 = 6_371_000.0;
+
+/// Effective Earth radius for radar propagation (4/3 model for atmospheric refraction).
+pub const EFFECTIVE_EARTH_RADIUS_M: f64 = EARTH_RADIUS_M * 4.0 / 3.0;
+
 // --- Display ---
 
 /// Maximum number of position history dots per track.

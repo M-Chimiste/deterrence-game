@@ -3,9 +3,9 @@
 ## Current State
 
 **Branch:** `mk2`
-**Phase:** 6 of 10 complete
-**Tests:** 78 passing (14 core + 46 sim + 5 app + 13 threat-ai), 0 clippy warnings
-**Date:** 2026-02-15
+**Phase:** 8 of 10 complete
+**Tests:** 122 passing (14 core + 65 sim + 5 app + 22 terrain + 16 threat-ai), 0 clippy warnings
+**Date:** 2026-02-17
 
 ---
 
@@ -252,3 +252,122 @@
 - `npx vite build` — 525KB bundle
 
 **Next:** Phase 7 — Audio & Polish
+
+### Session 7 — 2026-02-15: Phase 7 Complete (Audio & Polish — Scenarios, PN Guidance, Kinematics, Audio, UI)
+
+**What was done:**
+- Implemented scenario system:
+  - `scenario.rs` — `ScenarioId` enum (Easy/Medium/Hard), `build_schedule()` factory returning `WaveSchedule` per scenario
+  - `engine.rs` — `SelectScenario` command stores ID, `StartMission` uses it to build wave schedule. Backward-compatible (defaults to Easy).
+  - Easy: 3 waves, 8 threats, single axis (North), SeaSkimmerMk1 + SubsonicDrone
+  - Medium: 5 waves, 15 threats, dual axis (North + East), adds SupersonicCruiser, time-on-top coordination
+  - Hard: 7 waves, 25+ threats, 3 axes, adds TacticalBallistic, saturation waves
+- Implemented true Proportional Navigation (PN) guidance:
+  - `guidance.rs` — `pn_guidance()`: LOS rotation rate `omega = (LOS × V_rel) / R²`, acceleration `a = N * Vc * (omega × LOS_hat)`. Fallback to pure pursuit when closing velocity < 10 m/s.
+  - `missile_kinematics.rs` — Applied PN guidance during Midcourse/Terminal with turn rate limiting (angle interpolation per tick, renormalize to constant speed)
+- Implemented threat kinematics smoothing:
+  - `threat_ai.rs` — FSM returns target velocity + smooth flag. System interpolates using per-profile acceleration rates. Destroyed/Impact bypass smoothing.
+  - `profiles.rs` — Added acceleration rates (cruise_accel, terminal_accel) per archetype
+- Implemented mission complete detection:
+  - `engine.rs` — all_spawned + no Threat entities + no active engagements → GamePhase::MissionComplete
+- Implemented audio system (frontend):
+  - `audio/music.ts` — `MusicManager`: Howler.js-based music with phase-mapped tracks (menu, level1-3, gameover). Intro plays first, loop starts via onend callback.
+  - `audio/sfx.ts` — `SfxEngine`: Web Audio API procedural SFX (radar ping, bird away whoosh, splash hit/miss, vampire alarm)
+  - `audio/index.ts` — `consumeAudioEvents()` dispatches snapshot events to SFX engine
+  - `gameState.ts` — Audio init on first user gesture (click/keydown), music phase from GamePhase + ScenarioId
+- Built scenario selection screen:
+  - `screens/ScenarioSelect.tsx` — 3 cards with difficulty details, click to select + start
+- Built mission complete screen:
+  - `screens/MissionComplete.tsx` — Grade (S/A/B/C/F), score stats, return-to-menu button
+- Added doctrine display panel:
+  - `panels/DoctrineDisplay.tsx` — Current doctrine mode (AUTO-SPECIAL/MANUAL/AUTO-COMPOSITE)
+- Updated `App.tsx` — Scenario select as default connected screen, mission complete screen, music/SFX lifecycle
+
+**Key decisions:**
+- PN guidance with pure pursuit fallback handles edge cases (low closing velocity, perpendicular crossings)
+- Turn rate limiting prevents unrealistic instantaneous heading changes
+- Music phase mapped from GamePhase + ScenarioId (not mission elapsed time)
+- Web Audio API for procedural SFX (no audio file dependencies for game sounds)
+- Howler.js for music only (handles browser autoplay policy, looping, crossfade)
+
+**Verification:**
+- `cargo test --workspace` — 95 passing (14 core + 60 sim + 5 app + 16 threat-ai)
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo fmt --all --check` — clean
+- `npx tsc --noEmit` — clean
+- `npx vite build` — 530KB bundle
+
+**Next:** Phase 8 — Terrain & 3D World View
+
+### Session 8 — 2026-02-16/17: Phase 8 Complete (Terrain & 3D World View)
+
+**What was done:**
+
+*Sub-Phase 8.1: Terrain Core (`deterrence-terrain` crate)*
+- Replaced stub crate with full terrain system (6 modules, 22 tests):
+  - `projection.rs` — `GeoProjection`: equirectangular lat/lon ↔ sim-space meters. `x = (lon - ref_lon) * 111320 * cos(ref_lat)`, `y = (lat - ref_lat) * 111320`. Accurate <0.1% within 400km.
+  - `grid.rs` — `TerrainGrid` + `TerrainHeader`: row-major i16 elevation grid, bilinear interpolation queries (`elevation_at`, `elevation_at_geo`), ocean mask, `is_ocean()`, `downsample()` for frontend mesh
+  - `hgt.rs` — NASADEM HGT file parser: filename coordinate parsing (N25E056.hgt), 1"/3" tile size detection, big-endian i16 reading, void filling (neighbor averaging)
+  - `dtrn.rs` — Custom `.dtrn` binary format: 64-byte header (magic, version, flags, origin, cell_size, dimensions, elevation range), big-endian i16 elevations, optional packed ocean mask. Load/write/serialize/parse functions.
+  - `los.rs` — Line-of-sight calculation: ray-stepping at 100m intervals, terrain height check at each sample, Earth curvature correction (`earth_drop = d² / (2 * R_effective)`), atmospheric refraction (4/3 R_earth = 8495km effective radius)
+  - `coastline.rs` — Coastline polyline extraction: scans grid for land/ocean transitions (using ocean mask or elevation ≤ 0), chains points into connected polylines by proximity, Douglas-Peucker simplification
+
+*Sub-Phase 8.2: Engine Integration & Scenario Theater Config*
+- Added `TheaterConfig` struct to scenarios: geographic placement (name, center lat/lon, terrain file path)
+  - `scenario.rs` — `build_schedule()` now returns `(WaveSchedule, TheaterConfig)`. Easy/Medium = open ocean (terrain_file: None), Hard = Strait of Hormuz (terrain from .dtrn)
+- Added terrain to simulation engine:
+  - `engine.rs` — `terrain: Option<TerrainGrid>` + `theater: Option<TheaterConfig>` fields. Loaded at StartMission, cleared at ReturnToMenu. Terrain metadata included in snapshots.
+- Added radar terrain masking:
+  - `detection.rs` — Accepts `Option<&TerrainGrid>`, checks `has_line_of_sight(own_ship, target)` before Pd computation. Blocked LOS → detection miss (track fades).
+- Added `TerrainMeta` to `GameStateSnapshot` for frontend awareness
+- Added terrain constants: `TERRAIN_LOS_SAMPLE_INTERVAL` (100m), `EARTH_RADIUS_M`, `EFFECTIVE_EARTH_RADIUS_M`
+- 5 new tests: engine with terrain, backward compat without terrain, theater configs, terrain meta in snapshot, LOS-blocked detection
+
+*Sub-Phase 8.3: Frontend Terrain Data & PPI Coastline Overlay*
+- Rust IPC:
+  - `state.rs` — `TerrainDataPayload` struct (downsampled elevations + coastline polylines in sim-space)
+  - `game_loop.rs` — Builds terrain payload once per mission (downsample ≤512×512, extract coastlines), stores in `Arc<Mutex<...>>`
+  - `ipc.rs` — `get_terrain_data` Tauri command
+- Frontend:
+  - `tactical/CoastlineRenderer.ts` — Renders coastline polylines as dim green lines on PPI scope
+  - `store/gameState.ts` — `terrainData` + `terrainFetched` state, auto-fetch when mission starts with terrain, clear on menu return
+  - `ipc/bridge.ts` — `getTerrainData()` IPC wrapper
+  - `PPI.tsx` — CoastlineRenderer integration (loads once per mission, clears on menu)
+
+*Sub-Phase 8.4: 3D World View*
+- Created 8 modules in `frontend/src/world/`:
+  - `WorldScene.tsx` — Main 3D Preact component: WebGLRenderer, PerspectiveCamera, 60fps animation loop, reads snapshot from store, updates all subsystems
+  - `TerrainMesh.ts` — Displaced PlaneGeometry from heightmap data with elevation vertex coloring (ocean blue → shore sand → green → brown → snow/peak)
+  - `OceanPlane.ts` — 400km² water surface at y=0, dark blue semi-transparent
+  - `EntityMarkers.ts` — 3D track markers: octahedron (hostile, red), sphere (other classifications), cone (own-ship, green). MeshPhongMaterial with emissive glow. Object pooling with shared geometries.
+  - `MissileTrails.ts` — Trail lines from position history, blue for friendly interceptors, red for hostile threats
+  - `InterceptEffects.ts` — Flash effects: expanding sphere + point light for Splash events (white=hit, dim=miss), red flash for VampireImpact. Auto-cleanup after 0.5s.
+  - `CameraController.ts` — Orbit camera: mouse drag to orbit, scroll to zoom. Configurable polar/azimuth limits. Default overhead at 60° angle.
+  - `Sky.ts` — Gradient skybox via ShaderMaterial on inverted sphere (dark navy top, haze at horizon, dark below)
+- View toggle:
+  - `App.tsx` — W key toggles between PPI and 3D world view. View indicator badge at top center.
+  - `store/gameState.ts` — `viewMode: "ppi" | "world"` + `toggleViewMode()` action
+
+*Sub-Phase 8.5: Sample Terrain & HGT Processing*
+- Created `tools/terrain-prep` standalone binary (added to workspace):
+  - `convert` command: loads HGT file, optional resample to target resolution, writes .dtrn
+  - `synthetic` command: procedurally generates Strait of Hormuz-inspired terrain (northern mountains, southern coast, central strait, islands). Elevation ramp, trig-based noise, ocean mask.
+- Generated `public/terrain/hormuz_synth.dtrn` — 256×256 synthetic terrain (136KB), elevation range -50..1746m
+- Updated Hard scenario to reference `public/terrain/hormuz_synth.dtrn`
+
+**Key decisions:**
+- Equirectangular projection (not Mercator) — simpler, accurate enough within 400km radar range
+- .dtrn format uses big-endian i16 (matches HGT convention) but little-endian header fields
+- Terrain loaded at mission start, not continuously streamed — single TerrainGrid per mission
+- Terrain data shared to frontend via separate IPC call (`get_terrain_data`), not embedded in snapshots (too large for 30Hz)
+- 3D view is a separate rendering path (not overlaid on PPI) — full cleanup/dispose on toggle
+- Synthetic terrain ships in git repo; real NASADEM data requires user download + preprocessing
+
+**Verification:**
+- `cargo test --workspace` — 122 passing (14 core + 65 sim + 5 app + 22 terrain + 16 threat-ai)
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo fmt --all --check` — clean
+- `npx tsc --noEmit` — clean
+- `npx vite build` — 595KB bundle
+
+**Next:** Phase 9 — Campaign & Progression
